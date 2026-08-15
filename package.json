@@ -1,12 +1,28 @@
 {
   "name": "gistdb-sdk",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
+  "version": "0.1.0",
+  "description": "GitHub Gist como backend leve para pequenos projetos browser",
+  "type": "module",
+  "main": "./src/GistDB.js",
+  "exports": {
+    ".": "./src/GistDB.js",
+    "./crypto": "./src/CryptoManager.js",
+    "./errors": "./src/errors.js"
   },
-  "keywords": [],
-  "author": "Leo",
-  "license": "ISC"
+  "files": ["src/"],
+  "scripts": {
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "lint": "eslint src/",
+    "build": "esbuild src/GistDB.js --bundle --format=esm --outfile=dist/gistdb.min.js --minify"
+  },
+  "keywords": ["gist", "github", "database", "sync", "offline", "browser"],
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "eslint": "^9.0.0",
+    "jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
