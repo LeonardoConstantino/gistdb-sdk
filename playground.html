@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>GistDB Playground — Visualizador</title>
+    <style>
+      body {
+        font-family:
+          Inter,
+          system-ui,
+          Segoe UI,
+          Roboto,
+          Helvetica,
+          Arial,
+          sans-serif;
+        padding: 18px;
+        background: #f6fbff;
+        color: #0b1724;
+      }
+      h1 {
+        margin: 0 0 8px;
+      }
+      .panel {
+        background: #fff;
+        border: 1px solid #e6eef6;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      label {
+        min-width: 120px;
+        color: #334155;
+      }
+      input[type='text'],
+      input[type='password'],
+      textarea,
+      select {
+        flex: 1;
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid #d1e3f0;
+      }
+      textarea {
+        height: 80px;
+      }
+      button {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid #cfe6ff;
+        background: #f8fbff;
+        cursor: pointer;
+      }
+      .small {
+        padding: 6px 8px;
+        font-size: 13px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      pre {
+        background: #071226;
+        color: #d6f7ff;
+        padding: 10px;
+        border-radius: 6px;
+        overflow: auto;
+        max-height: 260px;
+      }
+      .muted {
+        color: #64748b;
+        font-size: 13px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .badge-live {
+        background: #e6ffef;
+        color: #065f46;
+      }
+      .badge-mock {
+        background: #fff7e6;
+        color: #92400e;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>GistDB Playground — Visualizador</h1>
+    <div class="panel">
+      <div class="row">
+        <label>Modo</label>
+        <select id="mode">
+          <option value="mock">Mock (local)</option>
+          <option value="live">Live (GitHub)</option>
+        </select>
+        <span id="modeBadge" class="badge badge-mock">Mock</span>
+      </div>
+
+      <div id="liveOptions" style="display: none">
+        <div class="row">
+          <label>Token GitHub</label
+          ><input
+            id="token"
+            type="password"
+            placeholder="ghp_xxx (não compartilhe)"
+          />
+        </div>
+        <div class="row">
+          <label>Gist ID (opcional)</label
+          ><input
+            id="gistId"
+            type="text"
+            placeholder="Deixe em branco para criar novo gist"
+          />
+        </div>
+        <div class="row">
+          <label>Prefix</label><input id="prefix" type="text" value="app" />
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Criptografia</label> <input id="useEncryption" type="checkbox" />
+        <span class="muted">Habilitar criptografia</span>
+        <input
+          id="encPassword"
+          type="password"
+          placeholder="Senha de criptografia"
+          style="max-width: 220px; margin-left: 8px; display: none"
+        />
+      </div>
+
+      <div class="row">
+        <label>Collection</label
+        ><input id="collection" type="text" value="todos" />
+      </div>
+      <div class="row">
+        <label>ID</label><input id="id" type="text" value="1" />
+      </div>
+      <div class="row">
+        <label>Dados (JSON)</label
+        ><textarea id="data">
+{ "titulo": "comprar leite", "done": false }</textarea
+        >
+      </div>
+
+      <div class="actions">
+        <button id="btnSet">set()</button>
+        <button id="btnGet">get()</button>
+        <button id="btnDelete">delete()</button>
+        <button id="btnList">list()</button>
+        <button id="btnWatch" class="small">watch()</button>
+        <button id="btnSync" class="small">sync()</button>
+        <button id="btnClearCache" class="small">clear cache</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <h3>Visão do ciclo</h3>
+        <div class="muted">Transporte</div>
+        <pre id="transportLog">(nenhuma operação ainda)</pre>
+        <div class="muted">Cache (sessionStorage)</div>
+        <pre id="cacheView">(vazio)</pre>
+      </div>
+      <div class="panel">
+        <h3>Dados — armazenados</h3>
+        <div class="muted">Representação no Gist (crua)</div>
+        <pre id="storedView">(vazio)</pre>
+        <div style="height: 8px"></div>
+        <div class="muted">Descriptografado (se aplicável)</div>
+        <pre id="decryptedView">(vazio)</pre>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Debug / Info</h3>
+      <div class="row">
+        <label>Resolver</label
+        ><select id="resolver">
+          <option value="last-write-wins">last-write-wins</option>
+          <option value="remote-wins">remote-wins</option>
+          <option value="local-wins">local-wins</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Status</label><span id="status">pronto</span>
+      </div>
+    </div>
+
+    <script type="module">
+      // Playground runtime: implementa operações principais em modo mock ou live.
+
+      const $ = (id) => document.getElementById(id);
+      const transportLog = [];
+
+      function logTransport(msg) {
+        transportLog.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
+        $('transportLog').textContent = transportLog.join('\n');
+      }
+      function updateCacheView() {
+        const out = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          out.push(`${k}: ${sessionStorage.getItem(k)}`);
+        }
+        $('cacheView').textContent = out.join('\n') || '(vazio)';
+      }
+      function setStatus(s) {
+        $('status').textContent = s;
+      }
+
+      // CryptoManager JS (portado do src/CryptoManager.ts)
+      class CryptoManagerJS {
+        constructor(key, salt) {
+          this.key = key;
+          this._salt = salt;
+        }
+        static async fromPassword(password, salt = null) {
+          const enc = new TextEncoder();
+          const cryptoObj = crypto;
+          const rawSalt = salt ?? cryptoObj.getRandomValues(new Uint8Array(32));
+          const baseKey = await cryptoObj.subtle.importKey(
+            'raw',
+            enc.encode(password),
+            'PBKDF2',
+            false,
+            ['deriveKey'],
+          );
+          const aesKey = await cryptoObj.subtle.deriveKey(
+            {
+              name: 'PBKDF2',
+              salt: rawSalt,
+              iterations: 310000,
+              hash: 'SHA-256',
+            },
+            baseKey,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt'],
+          );
+          return new CryptoManagerJS(aesKey, rawSalt);
+        }
+        static toB64(buf) {
+          return btoa(String.fromCharCode(...new Uint8Array(buf)));
+        }
+        static fromB64(s) {
+          return new Uint8Array([...atob(s)].map((c) => c.charCodeAt(0)));
+        }
+        async encrypt(obj) {
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const enc = new TextEncoder();
+          const data = enc.encode(JSON.stringify(obj));
+          const buf = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            this.key,
+            data,
+          );
+          return {
+            __encrypted: true,
+            iv: CryptoManagerJS.toB64(iv),
+            ciphertext: CryptoManagerJS.toB64(new Uint8Array(buf)),
+            salt: CryptoManagerJS.toB64(this._salt),
+          };
+        }
+        async decrypt(p) {
+          if (!p?.__encrypted) return p;
+          const iv = CryptoManagerJS.fromB64(p.iv);
+          const ct = CryptoManagerJS.fromB64(p.ciphertext);
+          const buf = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            this.key,
+            ct,
+          );
+          return JSON.parse(new TextDecoder().decode(buf));
+        }
+      }
+
+      // Simple resolver
+      function resolvePayload(strategy, local, remote) {
+        if (!remote) return local;
+        if (!local) return remote;
+        if (strategy === 'last-write-wins') {
+          const lt = new Date(local._updatedAt || 0).getTime();
+          const rt = new Date(remote._updatedAt || 0).getTime();
+          return lt >= rt ? local : remote;
+        }
+        if (strategy === 'remote-wins') return remote;
+        if (strategy === 'local-wins') return local;
+        return local;
+      }
+
+      // Live transport using GitHub Gist API
+      async function gistApiRequest(token, method, path, body = null) {
+        if (!token) throw new Error('Token ausente');
+        const opts = {
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json',
+          },
+        };
+        if (body !== null) opts.body = JSON.stringify(body);
+        const res = await fetch('https://api.github.com' + path, opts);
+        if (!res.ok) {
+          const txt = await res.text().catch(() => res.statusText);
+          throw new Error(`GitHub API ${res.status}: ${txt}`);
+        }
+        if (res.status === 204) return true;
+        return res.json();
+      }
+
+      async function initGistLive(token, prefix, existingGistId) {
+        // find or create
+        if (existingGistId) return existingGistId;
+        const gists = await gistApiRequest(token, 'GET', '/gists?per_page=100');
+        const found = gists.find((g) => g.description === `gistdb:${prefix}`);
+        if (found) return found.id;
+        const created = await gistApiRequest(token, 'POST', '/gists', {
+          description: `gistdb:${prefix}`,
+          public: false,
+          files: {},
+        });
+        return created.id;
+      }
+
+      async function getFileLive(token, gistId, filename) {
+        const gist = await gistApiRequest(token, 'GET', `/gists/${gistId}`);
+        if (!gist.files || !gist.files[filename]) return null;
+        try {
+          return JSON.parse(gist.files[filename].content);
+        } catch {
+          return null;
+        }
+      }
+      async function putFileLive(token, gistId, filename, data) {
+        const content = JSON.stringify(data, null, 2);
+        await gistApiRequest(token, 'PATCH', `/gists/${gistId}`, {
+          files: { [filename]: { content } },
+        });
+      }
+      async function deleteFileLive(token, gistId, filename) {
+        await gistApiRequest(token, 'PATCH', `/gists/${gistId}`, {
+          files: { [filename]: null },
+        });
+      }
+      async function listFilesLive(token, gistId, collection) {
+        const gist = await gistApiRequest(token, 'GET', `/gists/${gistId}`);
+        if (!gist.files) return [];
+        return Object.entries(gist.files)
+          .filter(([n]) => n.includes(`_${collection}_`))
+          .map(([, f]) => {
+            try {
+              return JSON.parse(f.content);
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+      }
+
+      // Mock transport: uses sessionStorage as backing store under key "mock_gist_files"
+      function getMockFiles() {
+        try {
+          const raw = sessionStorage.getItem('mock_gist_files');
+          return raw ? JSON.parse(raw) : {};
+        } catch {
+          return {};
+        }
+      }
+      function saveMockFiles(files) {
+        sessionStorage.setItem('mock_gist_files', JSON.stringify(files));
+      }
+      async function getFileMock(filename) {
+        const files = getMockFiles();
+        if (!files[filename]) return null;
+        try {
+          return JSON.parse(files[filename]);
+        } catch {
+          return null;
+        }
+      }
+      async function putFileMock(filename, data) {
+        const files = getMockFiles();
+        files[filename] = JSON.stringify(data, null, 2);
+        saveMockFiles(files);
+      }
+      async function deleteFileMock(filename) {
+        const files = getMockFiles();
+        delete files[filename];
+        saveMockFiles(files);
+      }
+      async function listFilesMock(collection) {
+        const files = getMockFiles();
+        return Object.entries(files)
+          .filter(([n]) => n.includes(`_${collection}_`))
+          .map(([, c]) => {
+            try {
+              return JSON.parse(c);
+            } catch {
+              return null;
+            }
+          })
+          .filter(Boolean);
+      }
+
+      // Playground logic
+      let watcherUnsub = null;
+      let cryptoInstance = null;
+      let gistdbInstance = null;
+      let gistdbConfig = null; // { token, prefix, gistId, password }
+
+      async function getCurrentCrypto() {
+        if (!$('useEncryption').checked) return null;
+        const pwd = $('encPassword').value || prompt('Senha de criptografia:');
+        if (!pwd) throw new Error('Senha necessária');
+        if (!cryptoInstance || cryptoInstance._pwd !== pwd) {
+          cryptoInstance = await CryptoManagerJS.fromPassword(pwd);
+          cryptoInstance._pwd = pwd;
+        }
+        return cryptoInstance;
+      }
+
+      function filename(col, id) {
+        return `gistdb_${$('prefix').value || 'app'}_${col}_${id}.json`;
+      }
+
+      async function ensureGistDB() {
+        // cria ou retorna instância existente se config igual
+        const token = $('token').value.trim();
+        const prefix = $('prefix').value.trim();
+        const gistIdVal = $('gistId').value.trim() || null;
+        const pwd = $('useEncryption').checked
+          ? $('encPassword').value || null
+          : null;
+        const cfg = { token, prefix, gistId: gistIdVal, password: pwd };
+        if (
+          gistdbInstance &&
+          JSON.stringify(cfg) === JSON.stringify(gistdbConfig)
+        )
+          return gistdbInstance;
+        // import bundle
+        try {
+          const mod = await import('./dist/gistdb.min.js');
+          const { GistDB } = mod;
+          gistdbInstance = await GistDB.create({
+            token,
+            prefix,
+            gistId: gistIdVal,
+            password: pwd,
+          });
+          gistdbConfig = cfg;
+          // try to resolve gistId for UI by querying gists with same prefix
+          try {
+            const gid = await initGistLive(token, prefix, gistIdVal);
+            if (gid) $('gistId').value = gid;
+          } catch (e) {}
+          logTransport('GistDB instance inicializada (dist)');
+          return gistdbInstance;
+        } catch (err) {
+          logTransport('Erro ao importar dist/gistdb.min.js: ' + err.message);
+          throw err;
+        }
+      }
+
+      async function doSet() {
+        try {
+          setStatus('set em andamento');
+          const mode = $('mode').value;
+          const col = $('collection').value;
+          const id = $('id').value;
+          const payload = JSON.parse($('data').value);
+          if (mode === 'mock') {
+            const entry = {
+              ...payload,
+              _id: id,
+              _version: 'v1',
+              _updatedAt: new Date().toISOString(),
+            };
+            const cm = await getCurrentCrypto().catch(() => null);
+            let toStore = entry;
+            if (cm) {
+              toStore = await cm.encrypt(entry);
+            }
+            await putFileMock(filename(col, id), toStore);
+            logTransport(`mock.putFile ${filename(col, id)}`);
+            sessionStorage.setItem(
+              `play:cache:${col}:${id}`,
+              JSON.stringify(entry),
+            );
+          } else {
+            const db = await ensureGistDB();
+            await db.set(col, id, payload);
+            logTransport(`live.set -> GistDB.set ${col}/${id}`);
+            sessionStorage.setItem(
+              `play:cache:${col}:${id}`,
+              JSON.stringify({
+                ...payload,
+                _id: id,
+                _updatedAt: new Date().toISOString(),
+              }),
+            );
+          }
+          updateCacheView();
+          await refreshStoredView();
+          setStatus('ok');
+        } catch (err) {
+          setStatus('erro: ' + err.message);
+          console.error(err);
+        }
+      }
+
+      async function doGet() {
+        try {
+          setStatus('get em andamento');
+          const mode = $('mode').value;
+          const col = $('collection').value;
+          const id = $('id').value;
+          let raw = null;
+          if (mode === 'mock') {
+            raw = await getFileMock(filename(col, id));
+            logTransport(`mock.getFile ${filename(col, id)}`);
+          } else {
+            const db = await ensureGistDB();
+            const data = await db.get(col, id);
+            raw = data;
+            logTransport(`live.get -> GistDB.get ${col}/${id}`);
+          }
+          $('storedView').textContent = raw
+            ? JSON.stringify(raw, null, 2)
+            : '(null)'; // decrypted view already handled by GistDB for live
+          const cm = await getCurrentCrypto().catch(() => null);
+          if (cm && raw && raw.__encrypted) {
+            const dec = await cm.decrypt(raw);
+            $('decryptedView').textContent = JSON.stringify(dec, null, 2);
+          } else if (raw) {
+            $('decryptedView').textContent = JSON.stringify(raw, null, 2);
+          } else {
+            $('decryptedView').textContent = '(null)';
+          }
+          setStatus('ok');
+        } catch (err) {
+          setStatus('erro: ' + err.message);
+          console.error(err);
+        }
+      }
+
+      async function doDelete() {
+        try {
+          setStatus('delete em andamento');
+          const mode = $('mode').value;
+          const col = $('collection').value;
+          const id = $('id').value;
+          if (mode === 'mock') {
+            await deleteFileMock(filename(col, id));
+            logTransport(`mock.deleteFile ${filename(col, id)}`);
+            sessionStorage.removeItem(`play:cache:${col}:${id}`);
+          } else {
+            const db = await ensureGistDB();
+            await db.delete(col, id);
+            logTransport(`live.delete -> GistDB.delete ${col}/${id}`);
+            sessionStorage.removeItem(`play:cache:${col}:${id}`);
+          }
+          updateCacheView();
+          await refreshStoredView();
+          setStatus('ok');
+        } catch (err) {
+          setStatus('erro: ' + err.message);
+          console.error(err);
+        }
+      }
+
+      async function doList() {
+        try {
+          setStatus('list em andamento');
+          const mode = $('mode').value;
+          const col = $('collection').value;
+          let out = null;
+          if (mode === 'mock') {
+            out = await listFilesMock(col);
+            logTransport(`mock.listFiles ${col}`);
+          } else {
+            const db = await ensureGistDB();
+            out = await db.list(col);
+            logTransport(`live.list -> GistDB.list ${col}`);
+          }
+          $('storedView').textContent = JSON.stringify(out, null, 2); // if encrypted, attempt decrypt
+          const cm = await getCurrentCrypto().catch(() => null);
+          if (cm) {
+            const dec = [];
+            for (const r of out) {
+              if (r && r.__encrypted) {
+                try {
+                  dec.push(await cm.decrypt(r));
+                } catch (e) {
+                  dec.push({ error: 'decrypt failed' });
+                }
+              } else dec.push(r);
+            }
+            $('decryptedView').textContent = JSON.stringify(dec, null, 2);
+          } else {
+            $('decryptedView').textContent =
+              '(use encryption to see decrypted)';
+          }
+          setStatus('ok');
+        } catch (err) {
+          setStatus('erro: ' + err.message);
+          console.error(err);
+        }
+      }
+
+      async function doSync() {
+        try {
+          setStatus('sync em andamento'); // clear cache
+          const keys = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+            keys.push(sessionStorage.key(i));
+          }
+          keys
+            .filter((k) => k?.startsWith('play:cache:'))
+            .forEach((k) => sessionStorage.removeItem(k));
+          updateCacheView();
+          logTransport('cache cleared');
+          setStatus('ok');
+        } catch (err) {
+          setStatus('erro: ' + err.message);
+        }
+      }
+
+      async function refreshStoredView() {
+        const mode = $('mode').value;
+        const col = $('collection').value;
+        const id = $('id').value;
+        let raw = null;
+        if (mode === 'mock') raw = await getFileMock(filename(col, id));
+        else {
+          // try to fetch raw gist file for preview
+          const token = $('token').value.trim();
+          const gid = $('gistId').value.trim();
+          try {
+            raw = await getFileLive(token, gid, filename(col, id));
+          } catch (e) {
+            raw = null;
+          }
+        }
+        $('storedView').textContent = raw
+          ? JSON.stringify(raw, null, 2)
+          : '(null)';
+        const cm = await getCurrentCrypto().catch(() => null);
+        if (cm && raw && raw.__encrypted) {
+          try {
+            $('decryptedView').textContent = JSON.stringify(
+              await cm.decrypt(raw),
+              null,
+              2,
+            );
+          } catch (e) {
+            $('decryptedView').textContent = '(decrypt failed)';
+          }
+        } else if (raw) {
+          $('decryptedView').textContent = JSON.stringify(raw, null, 2);
+        } else {
+          $('decryptedView').textContent = '(null)';
+        }
+      }
+
+      // UI wiring
+      $('mode').addEventListener('change', (e) => {
+        const v = e.target.value;
+        $('modeBadge').textContent = v === 'mock' ? 'Mock' : 'Live';
+        $('modeBadge').className =
+          'badge ' + (v === 'mock' ? 'badge-mock' : 'badge-live');
+        $('liveOptions').style.display = v === 'live' ? 'block' : 'none';
+      });
+      $('useEncryption').addEventListener('change', (e) => {
+        $('encPassword').style.display = e.target.checked
+          ? 'inline-block'
+          : 'none';
+      });
+      $('btnSet').addEventListener('click', doSet);
+      $('btnGet').addEventListener('click', doGet);
+      $('btnDelete').addEventListener('click', doDelete);
+      $('btnList').addEventListener('click', doList);
+      $('btnSync').addEventListener('click', doSync);
+      $('btnClearCache').addEventListener('click', () => {
+        // remove mock files too
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          if (k && (k.startsWith('play:cache:') || k === 'mock_gist_files'))
+            sessionStorage.removeItem(k);
+        }
+        updateCacheView();
+        logTransport('cleared play cache and mock files');
+      });
+
+      // watch emulation: toggles subscribe
+      $('btnWatch').addEventListener('click', () => {
+        if (watcherUnsub) {
+          watcherUnsub();
+          watcherUnsub = null;
+          $('btnWatch').textContent = 'watch()';
+          logTransport('watch unsubscribed');
+          return;
+        }
+        // create watcher that logs
+        watcherUnsub = function () {
+          watcherUnsub = null;
+          logTransport('watch unsubscribed');
+        };
+        $('btnWatch').textContent = 'unwatch()';
+        logTransport('watch subscribed (simulado)');
+      });
+
+      // initial
+      updateCacheView();
+      setStatus('pronto');
+    </script>
+  </body>
+</html>

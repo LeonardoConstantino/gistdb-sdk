@@ -294,6 +294,13 @@ Cobertura das suites:
 - LocalCacheAdapter — 6 testes
 - GistTransport (mock) — 6 testes
 - GistDB (integração) — 9 testes
+ - GistDB (integração) — 9 testes
+
+## Playground
+
+Há um playground interativo para testar o fluxo completo no browser: abra o arquivo `playground.html` na raiz do projeto. O playground oferece modo **mock** (opera localmente no sessionStorage) e modo **live** (usa a build em `dist/gistdb.min.js` e faz chamadas reais ao GitHub Gist).
+
+Aviso de segurança: se usar o modo live, insira um GitHub Personal Access Token com escopo `gist` apenas em ambientes seguros e evite salvar o token em localStorage.
 
 ---
 
