@@ -1,29 +1,33 @@
 /**
  * CryptoManager — criptografia AES-GCM com Web Crypto API nativa.
  * Zero dependências externas. Funciona em qualquer browser moderno.
- *
- * Segurança:
- *  - AES-GCM 256-bit: autenticado, com IV único por operação
- *  - PBKDF2 SHA-256: 310.000 iterações (OWASP 2024)
- *  - Salt aleatório por instância (salvo junto ao payload)
  */
-export class CryptoManager {
-  #key = null;
 
-  constructor(cryptoKey) {
+export interface EncryptedPayload {
+  __encrypted: true;
+  iv: string;
+  ciphertext: string;
+  salt: string;
+}
+
+export class CryptoManager {
+  #key: CryptoKey;
+  public _salt: Uint8Array | null = null;
+
+  constructor(cryptoKey: CryptoKey) {
     this.#key = cryptoKey;
   }
 
   /**
    * Deriva chave AES-GCM a partir de uma senha + salt.
-   * @param {string} password
-   * @param {Uint8Array} [salt]  - gerado aleatoriamente se omitido
    */
-  static async fromPassword(password, salt = null) {
+  static async fromPassword(password: string, salt: Uint8Array | null = null): Promise<CryptoManager> {
     const enc = new TextEncoder();
-    const rawSalt = salt ?? crypto.getRandomValues(new Uint8Array(32));
+    // Resolvendo crypto global
+    const cryptoObj = typeof crypto !== 'undefined' ? crypto : (globalThis as any).crypto;
+    const rawSalt = salt ?? cryptoObj.getRandomValues(new Uint8Array(32));
 
-    const baseKey = await crypto.subtle.importKey(
+    const baseKey = await cryptoObj.subtle.importKey(
       'raw',
       enc.encode(password),
       'PBKDF2',
@@ -31,7 +35,7 @@ export class CryptoManager {
       ['deriveKey'],
     );
 
-    const aesKey = await crypto.subtle.deriveKey(
+    const aesKey = await cryptoObj.subtle.deriveKey(
       {
         name: 'PBKDF2',
         salt: rawSalt,
@@ -51,15 +55,14 @@ export class CryptoManager {
 
   /**
    * Criptografa um objeto JS.
-   * @param {object} plainObject
-   * @returns {{ iv: string, ciphertext: string, salt: string }}
    */
-  async encrypt(plainObject) {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+  async encrypt(plainObject: any): Promise<EncryptedPayload> {
+    const cryptoObj = typeof crypto !== 'undefined' ? crypto : (globalThis as any).crypto;
+    const iv = cryptoObj.getRandomValues(new Uint8Array(12));
     const enc = new TextEncoder();
     const encoded = enc.encode(JSON.stringify(plainObject));
 
-    const cipherBuffer = await crypto.subtle.encrypt(
+    const cipherBuffer = await cryptoObj.subtle.encrypt(
       { name: 'AES-GCM', iv },
       this.#key,
       encoded,
@@ -69,22 +72,21 @@ export class CryptoManager {
       __encrypted: true,
       iv: CryptoManager.#toBase64(iv),
       ciphertext: CryptoManager.#toBase64(new Uint8Array(cipherBuffer)),
-      salt: CryptoManager.#toBase64(this._salt),
+      salt: CryptoManager.#toBase64(this._salt!),
     };
   }
 
   /**
    * Descriptografa um payload produzido por encrypt().
-   * @param {{ iv, ciphertext, salt }} payload
-   * @returns {object}
    */
-  async decrypt(payload) {
+  async decrypt(payload: any): Promise<any> {
     if (!payload?.__encrypted) return payload;
 
+    const cryptoObj = typeof crypto !== 'undefined' ? crypto : (globalThis as any).crypto;
     const iv = CryptoManager.#fromBase64(payload.iv);
     const ciphertext = CryptoManager.#fromBase64(payload.ciphertext);
 
-    const plainBuffer = await crypto.subtle.decrypt(
+    const plainBuffer = await cryptoObj.subtle.decrypt(
       { name: 'AES-GCM', iv },
       this.#key,
       ciphertext,
@@ -96,9 +98,8 @@ export class CryptoManager {
 
   /**
    * Verifica integridade sem descriptografar o conteúdo completo.
-   * Tenta decrypt e retorna true/false sem lançar erro para o caller.
    */
-  async verify(payload) {
+  async verify(payload: any): Promise<boolean> {
     try {
       await this.decrypt(payload);
       return true;
@@ -109,19 +110,23 @@ export class CryptoManager {
 
   /**
    * Re-deriva a chave a partir de um salt salvo (para restaurar sessão).
-   * @param {string} password
-   * @param {string} saltBase64
    */
-  static async restore(password, saltBase64) {
+  static async restore(password: string, saltBase64: string): Promise<CryptoManager> {
     const salt = CryptoManager.#fromBase64(saltBase64);
     return CryptoManager.fromPassword(password, salt);
   }
 
-  static #toBase64(buffer) {
-    return btoa(String.fromCharCode(...buffer));
+  static #toBase64(buffer: Uint8Array): string {
+    if (typeof btoa !== 'undefined') {
+      return btoa(String.fromCharCode(...buffer));
+    }
+    return Buffer.from(buffer).toString('base64');
   }
 
-  static #fromBase64(b64) {
-    return new Uint8Array([...atob(b64)].map((c) => c.charCodeAt(0)));
+  static #fromBase64(b64: string): Uint8Array {
+    if (typeof atob !== 'undefined') {
+      return new Uint8Array([...atob(b64)].map((c) => c.charCodeAt(0)));
+    }
+    return new Uint8Array(Buffer.from(b64, 'base64'));
   }
 }

@@ -1,20 +1,26 @@
+// @ts-ignore
 import { CryptoManager } from './CryptoManager.js';
 import { GistTransport } from './GistTransport.js';
+// @ts-ignore
 import { GistAPI } from './GistAPI.js';
 import { LocalCacheAdapter } from './LocalCacheAdapter.js';
+// @ts-ignore
 import { ConflictResolver } from './ConflictResolver.js';
+// @ts-ignore
 import { KeyVault } from './KeyVault.js';
 import { GistDBError } from './errors.js';
 
+
 export class GistDB {
-  #crypto = null;
-  #transport = null;
-  #cache = null;
-  #resolver = null;
+  #crypto: any = null;
+  #transport: GistTransport | null = null;
+  #cache: LocalCacheAdapter | null = null;
+  #resolver: any = null;
   #prefix = '';
-  #gistId = null;
-  #watchers = new Map();
-  #pollIntervals = new Map();
+  #gistId: string | null = null;
+  #watchers = new Map<string, Set<(id: string, data: any) => void>>();
+  #pollIntervals = new Map<string, any>();
+  #schema: Record<string, (data: any) => boolean> = {};
 
   constructor() {
     // Use GistDB.create() — não instancie diretamente
@@ -22,24 +28,24 @@ export class GistDB {
 
   /**
    * Factory assíncrono. Único ponto de entrada público.
-   * @param {object} options
-   * @param {string} options.token        - GitHub Personal Access Token
-   * @param {string} options.prefix       - Prefixo único do projeto (ex: 'myapp')
-   * @param {string} [options.gistId]     - ID de um Gist existente (opcional)
-   * @param {string} [options.encryptionKey] - Senha para criptografar dados
-   * @param {object} [options.schema]     - Mapa { collection: validatorFn }
-   * @param {string} [options.conflict]   - 'last-write-wins'|'remote-wins'|'local-wins'
-   * @param {number} [options.cacheTTL]   - TTL do cache local em ms (padrão: 5min)
    */
   static async create({
     token,
     prefix,
     gistId = null,
-    encryptionKey = null,
+    password = undefined,
     schema = {},
-    conflict = 'last-write-wins',
-    cacheTTL = 5 * 60 * 1000,
-  } = {}) {
+    conflictResolver = 'last-write-wins',
+    ttl = 5 * 60 * 1000,
+  }: {
+    token: string;
+    prefix: string;
+    gistId?: string | null;
+    password?: string;
+    schema?: Record<string, (data: any) => boolean>;
+    conflictResolver?: 'last-write-wins' | 'merge' | ((local: any, remote: any) => any);
+    ttl?: number;
+  }): Promise<GistDB> {
     if (!token)
       throw new GistDBError('TOKEN_REQUIRED', 'Forneça um GitHub token.');
     if (!prefix)
@@ -51,47 +57,57 @@ export class GistDB {
 
     KeyVault.store(token);
 
-    if (encryptionKey) {
-      db.#crypto = await CryptoManager.fromPassword(encryptionKey);
+    if (password) {
+      db.#crypto = await CryptoManager.fromPassword(password);
     }
 
     const api = new GistAPI(KeyVault.retrieve, prefix);
     db.#transport = new GistTransport(api);
-    db.#cache = new LocalCacheAdapter({ ttl: cacheTTL, prefix });
-    db.#resolver = new ConflictResolver(conflict);
+    db.#cache = new LocalCacheAdapter({ ttl, prefix });
+    db.#resolver = new ConflictResolver(conflictResolver);
     db.#schema = schema;
 
     if (!gistId) {
       db.#gistId = await db.#transport.initGist();
     }
 
-    db.#transport.setGistId(db.#gistId);
+    db.#transport.setGistId(db.#gistId!);
     return db;
   }
 
   // ─── CRUD ────────────────────────────────────────────────────
 
-  async get(collection, id) {
+  async get(collection: string, id: string): Promise<any> {
     this.#assertReady();
     const cacheKey = this.#key(collection, id);
 
-    const cached = await this.#cache.read(cacheKey);
+    const cached = await this.#cache!.read(cacheKey);
     if (cached) return cached.data;
 
-    const raw = await this.#transport.getFile(this.#filename(collection, id));
+    const raw = await this.#transport!.getFile(this.#filename(collection, id));
     if (!raw) return null;
 
     const data = await this.#maybeDecrypt(raw);
-    await this.#cache.write(cacheKey, data, raw._version);
+    await this.#cache!.write(cacheKey, data, raw._version);
     return data;
   }
 
-  async set(collection, id, data) {
+  async set(collection: string, id: string, data: any): Promise<{ id: string; version: string; updatedAt: string }> {
     this.#assertReady();
     this.#validate(collection, data);
 
-    const existing = await this.get(collection, id).catch(() => null);
-    const version = this.#nextVersion(existing?._version);
+    const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
+
+    // Se estiver offline, pula a leitura remota/resolução de conflito imediata da API
+    let remote: any = null;
+    if (isOnline) {
+      remote = await this.#transport!.getFile(this.#filename(collection, id)).catch(() => null);
+    }
+
+    const cached = await this.#cache!.read(this.#key(collection, id));
+    const currentVersion = remote?._version || cached?.version || 'v0';
+    const version = this.#nextVersion(currentVersion);
+
     const payload = {
       ...data,
       _id: id,
@@ -99,9 +115,6 @@ export class GistDB {
       _updatedAt: new Date().toISOString(),
     };
 
-    const remote = await this.#transport.getFile(
-      this.#filename(collection, id),
-    );
     const resolved = remote
       ? this.#resolver.resolve(payload, await this.#maybeDecrypt(remote), {
           version,
@@ -109,24 +122,24 @@ export class GistDB {
       : payload;
 
     const toWrite = await this.#maybeEncrypt(resolved);
-    await this.#transport.putFile(this.#filename(collection, id), toWrite);
-    await this.#cache.write(this.#key(collection, id), resolved, version);
+    await this.#transport!.putFile(this.#filename(collection, id), toWrite);
+    await this.#cache!.write(this.#key(collection, id), resolved, version);
 
     this.#notifyWatchers(collection, id, resolved);
     return { id, version, updatedAt: resolved._updatedAt };
   }
 
-  async delete(collection, id) {
+  async delete(collection: string, id: string): Promise<boolean> {
     this.#assertReady();
-    await this.#transport.deleteFile(this.#filename(collection, id));
-    await this.#cache.invalidate(this.#key(collection, id));
+    await this.#transport!.deleteFile(this.#filename(collection, id));
+    await this.#cache!.invalidate(this.#key(collection, id));
     this.#notifyWatchers(collection, id, null);
     return true;
   }
 
-  async list(collection, filterFn = null) {
+  async list(collection: string, filterFn: ((item: any) => boolean) | null = null): Promise<any[]> {
     this.#assertReady();
-    const files = await this.#transport.listFiles(collection);
+    const files = await this.#transport!.listFiles(collection);
     const results = await Promise.all(
       files.map(async (f) => {
         const data = await this.#maybeDecrypt(f);
@@ -138,29 +151,26 @@ export class GistDB {
 
   // ─── SYNC ────────────────────────────────────────────────────
 
-  async sync() {
+  async sync(): Promise<{ syncedAt: string }> {
     this.#assertReady();
-    await this.#cache.clear();
-    await this.#transport.flushQueue();
+    await this.#cache!.clear();
+    await this.#transport!.flushQueue();
     return { syncedAt: new Date().toISOString() };
   }
 
-  async getLastSyncAt() {
-    const meta = await this.#cache.read(`${this.#prefix}:__meta__`);
+  async getLastSyncAt(): Promise<string | null> {
+    const meta = await this.#cache!.read(`${this.#prefix}:__meta__`);
     return meta?.data?.lastSyncAt ?? null;
   }
 
   /**
    * Observa mudanças em uma collection via polling.
-   * @param {string} collection
-   * @param {function} callback   - (id, newData) => void
-   * @param {number}  [interval]  - ms entre checks (padrão: 30s)
    */
-  watch(collection, callback, interval = 30_000) {
+  watch(collection: string, callback: (id: string, data: any) => void, interval = 30_000): () => void {
     if (!this.#watchers.has(collection)) {
       this.#watchers.set(collection, new Set());
     }
-    this.#watchers.get(collection).add(callback);
+    this.#watchers.get(collection)!.add(callback);
 
     if (!this.#pollIntervals.has(collection)) {
       const timer = setInterval(
@@ -173,8 +183,23 @@ export class GistDB {
     return () => this.#unwatch(collection, callback);
   }
 
-  destroy() {
-    this.#pollIntervals.forEach((t) => clearInterval(t));
+  #unwatch(collection: string, callback: (id: string, data: any) => void): void {
+    const callbacks = this.#watchers.get(collection);
+    if (callbacks) {
+      callbacks.delete(callback);
+      if (callbacks.size === 0) {
+        this.#watchers.delete(collection);
+        const timer = this.#pollIntervals.get(collection);
+        if (timer) {
+          clearInterval(timer as any);
+          this.#pollIntervals.delete(collection);
+        }
+      }
+    }
+  }
+
+  destroy(): void {
+    this.#pollIntervals.forEach((t) => clearInterval(t as any));
     this.#pollIntervals.clear();
     this.#watchers.clear();
     KeyVault.clear();
@@ -182,30 +207,30 @@ export class GistDB {
 
   // ─── INTERNOS ────────────────────────────────────────────────
 
-  #key(collection, id) {
+  #key(collection: string, id: string): string {
     return `${this.#prefix}:${collection}:${id}`;
   }
 
-  #filename(collection, id) {
+  #filename(collection: string, id: string): string {
     return `gistdb_${this.#prefix}_${collection}_${id}.json`;
   }
 
-  #nextVersion(current) {
+  #nextVersion(current: string | null | undefined): string {
     const n = parseInt(current?.split('v')[1] ?? '0', 10);
-    return `v${n + 1}`;
+    return `v${isNaN(n) ? 1 : n + 1}`;
   }
 
-  async #maybeEncrypt(data) {
+  async #maybeEncrypt(data: any): Promise<any> {
     if (!this.#crypto) return data;
     return this.#crypto.encrypt(data);
   }
 
-  async #maybeDecrypt(data) {
+  async #maybeDecrypt(data: any): Promise<any> {
     if (!this.#crypto) return data;
     return this.#crypto.decrypt(data);
   }
 
-  #validate(collection, data) {
+  #validate(collection: string, data: any): void {
     const validator = this.#schema?.[collection];
     if (validator && !validator(data)) {
       throw new GistDBError(
@@ -215,18 +240,18 @@ export class GistDB {
     }
   }
 
-  #assertReady() {
+  #assertReady(): void {
     if (!this.#gistId)
       throw new GistDBError('NOT_INITIALIZED', 'GistDB não inicializado.');
   }
 
-  async #pollCollection(collection) {
-    const files = await this.#transport.listFiles(collection).catch(() => []);
+  async #pollCollection(collection: string): Promise<void> {
+    const files = await this.#transport!.listFiles(collection).catch(() => []);
     for (const f of files) {
       const data = await this.#maybeDecrypt(f);
-      const cached = await this.#cache.read(this.#key(collection, data._id));
+      const cached = await this.#cache!.read(this.#key(collection, data._id));
       if (cached?.version !== data._version) {
-        await this.#cache.write(
+        await this.#cache!.write(
           this.#key(collection, data._id),
           data,
           data._version,
@@ -236,7 +261,7 @@ export class GistDB {
     }
   }
 
-  #notifyWatchers(collection, id, data) {
+  #notifyWatchers(collection: string, id: string, data: any): void {
     const callbacks = this.#watchers.get(collection);
     if (!callbacks) return;
     callbacks.forEach((cb) => cb(id, data));
