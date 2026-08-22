@@ -19,6 +19,14 @@ export interface GistDBConfig {
   /** Estratégia de resolução de conflitos */
   /** Descoberta automática de Gist pelo prefixo se gistId omitido (padrão: true) */
   autoConnect?: boolean;
+  /** Sincronização automática orientada a eventos do ciclo de vida (onFocus, onReconnect, onUnload) */
+  autoSync?:
+    | boolean
+    | {
+        onFocus?: boolean;
+        onReconnect?: boolean;
+        onUnload?: boolean;
+      };
   /** Nome amigável do dispositivo atual (opcional) */
   deviceName?: string;
 }

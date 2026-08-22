@@ -27,7 +27,7 @@ Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK*
 ### Fase 2: Automação do Ciclo de Vida e Resiliência (DX)
 | ID | Task | Status | Dependências |
 |----|------|--------|--------------|
-| **03** | [Gerenciador de Ciclo de Vida (`autoSync`)](./tasks/03_auto_sync.md) | [ ] | 01, 02 |
+| **03** | [Gerenciador de Ciclo de Vida (`autoSync`)](./tasks/03_auto_sync.md) | [X] | 01, 02 |
 | **04** | [Fila de Mutações Offline (`OutboxQueueManager`)](./tasks/04_outbox_queue.md) | [ ] | 03 |
 
 ### Fase 3: Estado de Sessão e Polling Inteligente

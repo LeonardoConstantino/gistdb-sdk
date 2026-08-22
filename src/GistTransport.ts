@@ -55,10 +55,17 @@ export class GistTransport {
       const existing = await this.#retry<any[]>(() => this.#api.listGists());
       if (existing.length > 0) return existing[0].id;
     }
-    // GitHub rejects creating a gist with an empty `files` object (422).
-    // Create the gist with a small placeholder file so the API accepts it.
-    const placeholderName = `.gistdb_meta_${Date.now()}.json`;
-    const placeholder = { [placeholderName]: { content: JSON.stringify({ createdAt: new Date().toISOString() }) } };
+    // Cria o Gist inicial já incluindo o manifesto estático do banco de dados (evita erro 422 do GitHub)
+    const manifestContent = {
+      manifestVersion: '1.0',
+      createdAt: new Date().toISOString(),
+      generator: 'GistDB SDK',
+    };
+    const placeholder = {
+      'gistdb_manifest.json': {
+        content: JSON.stringify(manifestContent, null, 2),
+      },
+    };
     return this.#retry<any>(() => this.#api.createGist(placeholder, false));
   }
 

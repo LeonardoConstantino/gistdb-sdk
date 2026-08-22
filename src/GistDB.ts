@@ -25,6 +25,7 @@ export class GistDB {
   #pollIntervals = new Map<string, any>();
   #schema: Record<string, (data: any) => boolean> = {};
   #deviceInfo: DeviceInfo | null = null;
+  #autoSyncCleanups: Array<() => void> = [];
 
   constructor() {
     // Use GistDB.create() — não instancie diretamente
@@ -62,6 +63,7 @@ export class GistDB {
     conflictResolver = 'last-write-wins',
     ttl = 5 * 60 * 1000,
     autoConnect = true,
+    autoSync = false,
     deviceName = undefined,
   }: {
     token: string;
@@ -75,6 +77,13 @@ export class GistDB {
       | ((local: any, remote: any) => any);
     ttl?: number;
     autoConnect?: boolean;
+    autoSync?:
+      | boolean
+      | {
+          onFocus?: boolean;
+          onReconnect?: boolean;
+          onUnload?: boolean;
+        };
     deviceName?: string;
   }): Promise<GistDB> {
     if (!token)
@@ -105,6 +114,8 @@ export class GistDB {
     }
 
     db.#transport.setGistId(db.#gistId!);
+
+    db.#setupAutoSync(autoSync);
 
     // Registo silencioso do dispositivo na collection reservada __devices__
     await db.set('__devices__', db.#deviceInfo.id, {
@@ -276,7 +287,63 @@ export class GistDB {
     this.#pollIntervals.forEach((t) => clearInterval(t as any));
     this.#pollIntervals.clear();
     this.#watchers.clear();
+    this.#autoSyncCleanups.forEach((cleanup) => cleanup());
+    this.#autoSyncCleanups = [];
     KeyVault.clear();
+  }
+
+  #setupAutoSync(
+    opts:
+      | boolean
+      | {
+          onFocus?: boolean;
+          onReconnect?: boolean;
+          onUnload?: boolean;
+        },
+  ): void {
+    if (!opts) return;
+    const cfg =
+      typeof opts === 'boolean'
+        ? { onFocus: true, onReconnect: true, onUnload: true }
+        : {
+            onFocus: opts.onFocus ?? true,
+            onReconnect: opts.onReconnect ?? true,
+            onUnload: opts.onUnload ?? true,
+          };
+
+    if (typeof window === 'undefined' && typeof document === 'undefined') return;
+
+    if (cfg.onFocus && typeof document !== 'undefined') {
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible') {
+          this.sync().catch(() => {});
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+      this.#autoSyncCleanups.push(() =>
+        document.removeEventListener('visibilitychange', handleVisibility),
+      );
+    }
+
+    if (cfg.onReconnect && typeof window !== 'undefined') {
+      const handleOnline = () => {
+        this.sync().catch(() => {});
+      };
+      window.addEventListener('online', handleOnline);
+      this.#autoSyncCleanups.push(() =>
+        window.removeEventListener('online', handleOnline),
+      );
+    }
+
+    if (cfg.onUnload && typeof window !== 'undefined') {
+      const handleUnload = () => {
+        this.sync().catch(() => {});
+      };
+      window.addEventListener('beforeunload', handleUnload);
+      this.#autoSyncCleanups.push(() =>
+        window.removeEventListener('beforeunload', handleUnload),
+      );
+    }
   }
 
   // ─── INTERNOS ────────────────────────────────────────────────

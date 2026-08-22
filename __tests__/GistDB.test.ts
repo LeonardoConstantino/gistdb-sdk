@@ -201,4 +201,21 @@ describe('GistDB (integração)', () => {
     expect(devices.length).toBeGreaterThanOrEqual(1);
     expect(devices.some((d: any) => d.name === 'PC')).toBe(true);
   });
+
+  test('Task 03: autoSync registra listeners e destroy remove sem erros', async () => {
+    const listeners: Record<string, any> = {};
+    (globalThis as any).document = {
+      visibilityState: 'visible',
+      addEventListener: (evt: string, fn: any) => { listeners[evt] = fn; },
+      removeEventListener: (evt: string) => { delete listeners[evt]; },
+    };
+    (globalThis as any).window = {
+      addEventListener: (evt: string, fn: any) => { listeners[evt] = fn; },
+      removeEventListener: (evt: string) => { delete listeners[evt]; },
+    };
+
+    const db = await makeTestDB();
+    (db as any)['#setupAutoSync']?.({ onFocus: true, onReconnect: true });
+    expect(() => db.destroy()).not.toThrow();
+  });
 });
