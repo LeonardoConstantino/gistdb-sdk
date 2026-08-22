@@ -9,6 +9,7 @@ import { ConflictResolver } from './ConflictResolver.js';
 // @ts-ignore
 import { KeyVault } from './KeyVault.js';
 import { GistDBError } from './errors.js';
+import { Logger } from './Logger.js';
 
 
 export class GistDB {
@@ -16,6 +17,7 @@ export class GistDB {
   #transport: GistTransport | null = null;
   #cache: LocalCacheAdapter | null = null;
   #resolver: any = null;
+  #password: string | null = null;
   #prefix = '';
   #gistId: string | null = null;
   #watchers = new Map<string, Set<(id: string, data: any) => void>>();
@@ -43,7 +45,10 @@ export class GistDB {
     gistId?: string | null;
     password?: string;
     schema?: Record<string, (data: any) => boolean>;
-    conflictResolver?: 'last-write-wins' | 'merge' | ((local: any, remote: any) => any);
+    conflictResolver?:
+      | 'last-write-wins'
+      | 'merge'
+      | ((local: any, remote: any) => any);
     ttl?: number;
   }): Promise<GistDB> {
     if (!token)
@@ -59,6 +64,7 @@ export class GistDB {
 
     if (password) {
       db.#crypto = await CryptoManager.fromPassword(password);
+      db.#password = password;
     }
 
     const api = new GistAPI(KeyVault.retrieve, prefix);
@@ -92,7 +98,11 @@ export class GistDB {
     return data;
   }
 
-  async set(collection: string, id: string, data: any): Promise<{ id: string; version: string; updatedAt: string }> {
+  async set(
+    collection: string,
+    id: string,
+    data: any,
+  ): Promise<{ id: string; version: string; updatedAt: string }> {
     this.#assertReady();
     this.#validate(collection, data);
 
@@ -101,7 +111,9 @@ export class GistDB {
     // Se estiver offline, pula a leitura remota/resolução de conflito imediata da API
     let remote: any = null;
     if (isOnline) {
-      remote = await this.#transport!.getFile(this.#filename(collection, id)).catch(() => null);
+      remote = await this.#transport!.getFile(
+        this.#filename(collection, id),
+      ).catch(() => null);
     }
 
     const cached = await this.#cache!.read(this.#key(collection, id));
@@ -115,8 +127,24 @@ export class GistDB {
       _updatedAt: new Date().toISOString(),
     };
 
+    let remoteDecrypted = null;
+    if (remote) {
+      try {
+        remoteDecrypted = await this.#maybeDecrypt(remote);
+      } catch (err) {
+        // proteção adicional: se algo falhar na descriptografia, logamos e
+        // prosseguimos usando o payload remoto bruto para não bloquear a operação.
+        // eslint-disable-next-line no-console
+        console.warn(
+          'GistDB.set: falha ao descriptografar remote, usando payload bruto',
+          err,
+        );
+        remoteDecrypted = remote;
+      }
+    }
+
     const resolved = remote
-      ? this.#resolver.resolve(payload, await this.#maybeDecrypt(remote), {
+      ? this.#resolver.resolve(payload, remoteDecrypted, {
           version,
         })
       : payload;
@@ -137,7 +165,10 @@ export class GistDB {
     return true;
   }
 
-  async list(collection: string, filterFn: ((item: any) => boolean) | null = null): Promise<any[]> {
+  async list(
+    collection: string,
+    filterFn: ((item: any) => boolean) | null = null,
+  ): Promise<any[]> {
     this.#assertReady();
     const files = await this.#transport!.listFiles(collection);
     const results = await Promise.all(
@@ -166,7 +197,11 @@ export class GistDB {
   /**
    * Observa mudanças em uma collection via polling.
    */
-  watch(collection: string, callback: (id: string, data: any) => void, interval = 30_000): () => void {
+  watch(
+    collection: string,
+    callback: (id: string, data: any) => void,
+    interval = 30_000,
+  ): () => void {
     if (!this.#watchers.has(collection)) {
       this.#watchers.set(collection, new Set());
     }
@@ -183,7 +218,10 @@ export class GistDB {
     return () => this.#unwatch(collection, callback);
   }
 
-  #unwatch(collection: string, callback: (id: string, data: any) => void): void {
+  #unwatch(
+    collection: string,
+    callback: (id: string, data: any) => void,
+  ): void {
     const callbacks = this.#watchers.get(collection);
     if (callbacks) {
       callbacks.delete(callback);
@@ -227,7 +265,55 @@ export class GistDB {
 
   async #maybeDecrypt(data: any): Promise<any> {
     if (!this.#crypto) return data;
-    return this.#crypto.decrypt(data);
+    try {
+      return await this.#crypto.decrypt(data);
+    } catch (err) {
+      // Se a descriptografia falhar, emitimos logs estruturados para
+      // investigação e tentamos re-derivar a chave a partir do `salt`.
+      Logger.warn('GistDB', 'decrypt failed, attempting restore via salt', {
+        hasSalt: !!data?.salt,
+        passwordPresent: !!this.#password,
+        // include payload analysis to aid diagnosis
+        payload: CryptoManager.analyzePayload(data),
+      });
+      if (data?.salt && this.#password) {
+        try {
+          const restored = await CryptoManager.restore(
+            this.#password,
+            data.salt,
+          );
+          this.#crypto = restored;
+          // Verifica integridade antes de tentar descriptografar
+          try {
+            const verified = await restored.verify(data).catch(() => false);
+            Logger.info('GistDB', 'verify after restore', { verified });
+            if (verified) {
+              return await this.#crypto.decrypt(data);
+            }
+            Logger.warn(
+              'GistDB',
+              'payload verification failed after restore, returning raw payload',
+            );
+            return data;
+          } catch (err3) {
+            Logger.warn('GistDB', 'decrypt still failing after restore', {
+              err: err3?.message || String(err3),
+            });
+            return data;
+          }
+        } catch (err2) {
+          Logger.warn(
+            'GistDB',
+            'restore via salt failed, returning raw payload',
+            {
+              err: err2?.message || String(err2),
+            },
+          );
+          return data;
+        }
+      }
+      return data;
+    }
   }
 
   #validate(collection: string, data: any): void {
@@ -267,3 +353,5 @@ export class GistDB {
     callbacks.forEach((cb) => cb(id, data));
   }
 }
+
+export { Logger };
