@@ -140,6 +140,7 @@ const db = await GistDB.create({
 | `prefix`           | `string`                                   |     ✅      | Prefixo único para namespacing das collections    |
 | `gistId`           | `string \| null`                           |     ❌      | ID de um Gist existente (cria um novo se omitido) |
 | `autoConnect`      | `boolean`                                  |     ❌      | Busca/reaproveita Gist existente com o prefixo se `gistId` for omitido (padrão: `true`) |
+| `deviceName`       | `string`                                   |     ❌      | Nome amigável do dispositivo atual (ex: "MacBook do Leo") |
 | `password`         | `string`                                   |     ❌      | Senha para criptografia AES dos dados             |
 | `ttl`              | `number`                                   |     ❌      | Tempo de vida do cache em ms (padrão: `300000`)   |
 | `conflictResolver` | `'last-write-wins' \| 'merge' \| function` |     ❌      | Estratégia de resolução de conflito               |

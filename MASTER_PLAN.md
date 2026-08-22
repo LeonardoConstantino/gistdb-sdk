@@ -22,7 +22,7 @@ Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK*
 | ID | Task | Status | Dependências |
 |----|------|--------|--------------|
 | **01** | [Descoberta Automática de Gist (`autoConnect`)](./tasks/01_auto_connect.md) | [X] | — |
-| **02** | [Identidade de Dispositivo & Metadados de Envelope](./tasks/02_device_identity.md) | [ ] | — |
+| **02** | [Identidade de Dispositivo & Metadados de Envelope](./tasks/02_device_identity.md) | [X] | — |
 
 ### Fase 2: Automação do Ciclo de Vida e Resiliência (DX)
 | ID | Task | Status | Dependências |

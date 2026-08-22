@@ -56,6 +56,15 @@ async function makeTestDB(opts: { encryptionKey?: string; schema?: Record<string
   function nextVer(v?: string) { return `v${parseInt(v?.split('v')[1] ?? '0', 10) + 1}`; }
 
   return {
+    deviceId: 'mock-dev-123',
+    get devices() {
+      return {
+        list: async () => {
+          const list = await this.list('__devices__').catch(() => []);
+          return list.map((d: any) => ({ ...d, id: d._id || d.id }));
+        },
+      };
+    },
     async set(collection: string, id: string, data: any) {
       const validator = schema[collection];
       if (validator && !validator(data))
@@ -63,7 +72,13 @@ async function makeTestDB(opts: { encryptionKey?: string; schema?: Record<string
 
       const existing = await this.get(collection, id).catch(() => null);
       const version = nextVer(existing?._version);
-      const payload = { ...data, _id: id, _version: version, _updatedAt: new Date().toISOString() };
+      const payload = {
+        ...data,
+        _id: id,
+        _version: version,
+        _updatedAt: new Date().toISOString(),
+        _device: { id: 'mock-dev-123', name: 'Mock Device', platform: 'Node' },
+      };
 
       const remote = await transport.getFile(filename(collection, id));
       const resolved = remote ? resolver.resolve(payload, remote, { version }) : payload;
@@ -168,5 +183,22 @@ describe('GistDB (integração)', () => {
     const db = await makeTestDB();
     db.watch('col', () => {});
     expect(() => db.destroy()).not.toThrow();
+  });
+
+  test('Task 02: set() inclui metadados de _device no payload', async () => {
+    const db = await makeTestDB();
+    await db.set('docs', 'd1', { titulo: 'teste' });
+    const r = await db.get('docs', 'd1');
+    expect(r._device).toBeDefined();
+    expect(typeof r._device.id).toBe('string');
+    expect(typeof r._device.name).toBe('string');
+  });
+
+  test('Task 02: db.devices.list() retorna dispositivos registrados', async () => {
+    const db = await makeTestDB();
+    await db.set('__devices__', 'dev-pc-1', { name: 'PC', platform: 'Linux' });
+    const devices = await db.devices.list();
+    expect(devices.length).toBeGreaterThanOrEqual(1);
+    expect(devices.some((d: any) => d.name === 'PC')).toBe(true);
   });
 });

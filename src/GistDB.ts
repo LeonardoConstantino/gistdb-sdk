@@ -9,7 +9,8 @@ import { ConflictResolver } from './ConflictResolver.js';
 // @ts-ignore
 import { KeyVault } from './KeyVault.js';
 import { GistDBError } from './errors.js';
-import { Logger } from './Logger.js';
+import { DeviceIdentity } from './DeviceIdentity.js';
+import { DeviceInfo } from './types.js';
 
 
 export class GistDB {
@@ -23,9 +24,30 @@ export class GistDB {
   #watchers = new Map<string, Set<(id: string, data: any) => void>>();
   #pollIntervals = new Map<string, any>();
   #schema: Record<string, (data: any) => boolean> = {};
+  #deviceInfo: DeviceInfo | null = null;
 
   constructor() {
     // Use GistDB.create() — não instancie diretamente
+  }
+
+  get deviceId(): string {
+    return this.#deviceInfo?.id || '';
+  }
+
+  get devices() {
+    return {
+      list: async (): Promise<DeviceInfo[]> => {
+        this.#assertReady();
+        const list = await this.list('__devices__').catch(() => []);
+        return list.map((dev: any) => ({
+          id: dev._id || dev.id,
+          name: dev.name,
+          platform: dev.platform,
+          lastSeenAt: dev.lastSeenAt || dev._updatedAt,
+          isCurrent: dev._id === this.deviceId || dev.id === this.deviceId,
+        }));
+      },
+    };
   }
 
   /**
@@ -40,6 +62,7 @@ export class GistDB {
     conflictResolver = 'last-write-wins',
     ttl = 5 * 60 * 1000,
     autoConnect = true,
+    deviceName = undefined,
   }: {
     token: string;
     prefix: string;
@@ -52,6 +75,7 @@ export class GistDB {
       | ((local: any, remote: any) => any);
     ttl?: number;
     autoConnect?: boolean;
+    deviceName?: string;
   }): Promise<GistDB> {
     if (!token)
       throw new GistDBError('TOKEN_REQUIRED', 'Forneça um GitHub token.');
@@ -61,6 +85,7 @@ export class GistDB {
     const db = new GistDB();
     db.#prefix = prefix;
     db.#gistId = gistId;
+    db.#deviceInfo = DeviceIdentity.getDeviceInfo(deviceName);
 
     KeyVault.store(token);
 
@@ -80,6 +105,14 @@ export class GistDB {
     }
 
     db.#transport.setGistId(db.#gistId!);
+
+    // Registo silencioso do dispositivo na collection reservada __devices__
+    await db.set('__devices__', db.#deviceInfo.id, {
+      name: db.#deviceInfo.name,
+      platform: db.#deviceInfo.platform,
+      lastSeenAt: db.#deviceInfo.lastSeenAt,
+    }).catch(() => {});
+
     return db;
   }
 
@@ -127,6 +160,7 @@ export class GistDB {
       _id: id,
       _version: version,
       _updatedAt: new Date().toISOString(),
+      _device: this.#deviceInfo,
     };
 
     let remoteDecrypted = null;

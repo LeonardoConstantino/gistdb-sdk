@@ -19,6 +19,16 @@ export interface GistDBConfig {
   /** Estratégia de resolução de conflitos */
   /** Descoberta automática de Gist pelo prefixo se gistId omitido (padrão: true) */
   autoConnect?: boolean;
+  /** Nome amigável do dispositivo atual (opcional) */
+  deviceName?: string;
+}
+
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  platform: string;
+  lastSeenAt: string;
+  isCurrent?: boolean;
 }
 
 export interface CacheEntry<T = any> {
