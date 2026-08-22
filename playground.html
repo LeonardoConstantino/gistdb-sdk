@@ -1,735 +1,1193 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>GistDB Playground — Visualizador</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GistDB — Demonstração da API pública</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <style>
+      :root {
+        --ink: #10131a;
+        --panel: #171b24;
+        --panel-2: #1d222d;
+        --line: #2a2f3b;
+        --paper: #e7e4da;
+        --muted: #8a8f9c;
+        --green: #5fd98a;
+        --red: #ff6b6b;
+        --amber: #f2b84b;
+        --violet: #9d8cf2;
+        --radius: 10px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
       body {
-        font-family:
-          Inter,
-          system-ui,
-          Segoe UI,
-          Roboto,
-          Helvetica,
-          Arial,
-          sans-serif;
-        padding: 18px;
-        background: #f6fbff;
-        color: #0b1724;
+        margin: 0;
+        padding: 0;
       }
-      h1 {
-        margin: 0 0 8px;
+      body {
+        background: var(--ink);
+        color: var(--paper);
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
       }
+      code,
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+      }
+      a {
+        color: var(--violet);
+      }
+      :focus-visible {
+        outline: 2px solid var(--violet);
+        outline-offset: 2px;
+      }
+
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+      }
+
+      .hero {
+        padding: 24px 0 40px;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 32px;
+      }
+      .eyebrow {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--amber);
+        margin: 0 0 14px;
+      }
+      .hero h1 {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 700;
+        font-size: clamp(28px, 4.4vw, 44px);
+        margin: 0 0 14px;
+        line-height: 1.15;
+        letter-spacing: -0.01em;
+      }
+      .hero h1 code {
+        color: var(--green);
+        background: none;
+      }
+      .lede {
+        max-width: 640px;
+        color: var(--muted);
+        font-size: 16px;
+        margin: 0 0 20px;
+      }
+      .lede code {
+        color: var(--paper);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 14px;
+        color: var(--paper);
+        background: var(--panel);
+      }
+      .badge::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--amber);
+      }
+      .badge.full::before {
+        background: var(--green);
+      }
+
+      .notice {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--amber);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        margin-bottom: 28px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .notice strong {
+        color: var(--paper);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 24px;
+        align-items: start;
+      }
+      @media (max-width: 900px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
       .panel {
-        background: #fff;
-        border: 1px solid #e6eef6;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 12px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 20px 20px 22px;
+        margin-bottom: 20px;
       }
+      .panel h2 {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 4px;
+        color: var(--paper);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .panel h2 .n {
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .panel .desc {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 16px;
+      }
+
+      .locked {
+        opacity: 0.4;
+        pointer-events: none;
+        filter: grayscale(0.4);
+        transition: opacity 0.2s;
+      }
+
       .row {
         display: flex;
-        gap: 8px;
-        align-items: center;
-        margin-bottom: 8px;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
       }
-      label {
-        min-width: 120px;
-        color: #334155;
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1 1 160px;
+      }
+      .field label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .field.checkbox {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+      .field.checkbox label {
+        font-size: 13px;
+        color: var(--paper);
       }
       input[type='text'],
       input[type='password'],
-      textarea,
-      select {
-        flex: 1;
-        padding: 8px;
+      input[type='number'],
+      select,
+      textarea {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
         border-radius: 6px;
-        border: 1px solid #d1e3f0;
+        color: var(--paper);
+        padding: 9px 10px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        width: 100%;
       }
       textarea {
-        height: 80px;
+        min-height: 76px;
+        resize: vertical;
       }
-      button {
-        padding: 8px 12px;
-        border-radius: 6px;
-        border: 1px solid #cfe6ff;
-        background: #f8fbff;
-        cursor: pointer;
+      input::placeholder,
+      textarea::placeholder {
+        color: #565c6b;
       }
-      .small {
-        padding: 6px 8px;
-        font-size: 13px;
-      }
-      .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
-      pre {
-        background: #071226;
-        color: #d6f7ff;
-        padding: 10px;
-        border-radius: 6px;
-        overflow: auto;
-        max-height: 260px;
-      }
-      .muted {
-        color: #64748b;
-        font-size: 13px;
-      }
-      .badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 999px;
-        font-size: 12px;
-      }
-      .badge-live {
-        background: #e6ffef;
-        color: #065f46;
-      }
-      .badge-mock {
-        background: #fff7e6;
-        color: #92400e;
-      }
+
       .actions {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      button {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        font-weight: 600;
+        padding: 9px 14px;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--paper);
+        cursor: pointer;
+        transition:
+          0.15s border-color,
+          0.15s transform;
+      }
+      button:hover {
+        border-color: var(--violet);
+      }
+      button:active {
+        transform: translateY(1px);
+      }
+      button.primary {
+        background: var(--green);
+        color: #0b140e;
+        border-color: var(--green);
+      }
+      button.danger {
+        background: var(--red);
+        color: #210707;
+        border-color: var(--red);
+      }
+      button.ghost {
+        background: transparent;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .log-rail {
+        position: sticky;
+        top: 20px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 18px 18px 6px;
+        max-height: calc(100vh - 40px);
+        display: flex;
+        flex-direction: column;
+      }
+      .log-rail h2 {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 0 0 12px;
+      }
+      .commit-log {
+        list-style: none;
+        margin: 0;
+        padding: 0 0 12px;
+        overflow-y: auto;
+        flex: 1;
+        border-left: 1px solid var(--line);
+        padding-left: 16px;
+      }
+      .commit-log li {
+        position: relative;
+        padding-bottom: 16px;
+        font-size: 12.5px;
+      }
+      .commit-log li::before {
+        content: '';
+        position: absolute;
+        left: -20.5px;
+        top: 3px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--muted);
+        border: 2px solid var(--panel);
+      }
+      .commit-log li.ok::before {
+        background: var(--green);
+      }
+      .commit-log li.err::before {
+        background: var(--red);
+      }
+      .commit-log li.warn::before {
+        background: var(--amber);
+      }
+      .commit-log li.info::before {
+        background: var(--violet);
+      }
+      .commit-log .cl-method {
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--paper);
+        font-weight: 600;
+      }
+      .commit-log .cl-detail {
+        color: var(--muted);
+        display: block;
+        margin-top: 2px;
+        word-break: break-word;
+      }
+      .commit-log .cl-ts {
+        color: #565c6b;
+        font-size: 11px;
+      }
+      .log-empty {
+        color: var(--muted);
+        font-size: 13px;
+        padding: 8px 0;
+      }
+
+      .coverage {
+        margin-top: 8px;
+      }
+      .coverage h2 {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 16px;
+        margin: 0 0 4px;
+      }
+      .coverage .desc {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 18px;
+      }
+      .chip-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+        gap: 10px;
+      }
+      .chip {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 8px;
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .chip .chip-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .chip .chip-method {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 13px;
+      }
+      .chip .chip-status {
+        font-size: 11px;
+        font-family: 'JetBrains Mono', monospace;
+        color: var(--muted);
+      }
+      .chip.covered {
+        border-color: var(--green);
+      }
+      .chip.covered .chip-status {
+        color: var(--green);
+      }
+      .chip .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--muted);
+        flex-shrink: 0;
+      }
+      .chip.covered .dot {
+        background: var(--green);
+      }
+      .chip .chip-desc {
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .divider {
+        border: none;
+        border-top: 1px solid var(--line);
+        margin: 14px 0;
+      }
+      footer {
+        margin-top: 48px;
+        color: var(--muted);
+        font-size: 12.5px;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+        }
       }
     </style>
   </head>
   <body>
-    <h1>GistDB Playground — Visualizador</h1>
-    <div class="panel">
-      <div class="row">
-        <label>Modo</label>
-        <select id="mode">
-          <option value="mock">Mock (local)</option>
-          <option value="live">Live (GitHub)</option>
-        </select>
-        <span id="modeBadge" class="badge badge-mock">Mock</span>
+    <div class="page">
+      <header class="hero">
+        <p class="eyebrow">GistDB · loja chave-valor versionada em Gists</p>
+        <h1>Cada <code>set()</code> é um commit.</h1>
+        <p class="lede">
+          Demonstração funcional da API pública exportada por
+          <code>./dist/gistdb.min.js</code> (<code>GistDB</code> e
+          <code>Logger</code>). Cada botão abaixo chama diretamente o módulo
+          importado — nada aqui reimplementa ou resume a lógica interna.
+        </p>
+        <div class="badge" id="coverageBadge">0 / 11 endpoints exercitados</div>
+      </header>
+
+      <div class="notice">
+        <strong>Antes de usar:</strong> rode o build do projeto para gerar
+        <code>./dist/gistdb.min.js</code> ao lado deste arquivo, e tenha um
+        GitHub token com escopo <code>gist</code> em mãos. O token só é usado
+        localmente, no navegador, para chamar a API do GitHub — esta página não
+        o envia a nenhum outro lugar. Se abrir o arquivo com
+        <code>file://</code>, o import de módulo ES pode ser bloqueado; sirva a
+        pasta com um servidor estático simples (ex.: <code>npx serve</code>).
       </div>
 
-      <div id="liveOptions" style="display: none">
-        <div class="row">
-          <label>Token GitHub</label
-          ><input
-            id="token"
-            type="password"
-            placeholder="ghp_xxx (não compartilhe)"
-          />
-        </div>
-        <div class="row">
-          <label>Gist ID (opcional)</label
-          ><input
-            id="gistId"
-            type="text"
-            placeholder="Deixe em branco para criar novo gist"
-          />
-        </div>
-        <div class="row">
-          <label>Prefix</label><input id="prefix" type="text" value="app" />
-        </div>
+      <div class="layout">
+        <section class="controls">
+          <!-- SETUP -->
+          <div class="panel" id="panelSetup">
+            <h2>01 · Inicialização <span class="n">GistDB.create()</span></h2>
+            <p class="desc">
+              Único ponto de entrada público da classe. Cria o transporte, o
+              cache local, o resolvedor de conflitos e, se necessário, um gist
+              novo.
+            </p>
+
+            <div class="row">
+              <div class="field">
+                <label for="in-token">GitHub token (escopo gist)</label>
+                <input
+                  type="password"
+                  id="in-token"
+                  placeholder="ghp_..."
+                  autocomplete="off"
+                />
+              </div>
+              <div class="field">
+                <label for="in-prefix">prefix</label>
+                <input
+                  type="text"
+                  id="in-prefix"
+                  placeholder="demo-app"
+                  value="demo-app"
+                />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="in-gistid"
+                  >gistId (opcional — reusar gist existente)</label
+                >
+                <input
+                  type="text"
+                  id="in-gistid"
+                  placeholder="deixe em branco para criar um novo"
+                />
+              </div>
+              <div class="field">
+                <label for="in-password"
+                  >password (opcional — ativa criptografia)</label
+                >
+                <input
+                  type="password"
+                  id="in-password"
+                  placeholder="sem senha = sem criptografia"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="in-resolver">conflictResolver</label>
+                <select id="in-resolver">
+                  <option value="last-write-wins">
+                    last-write-wins (padrão)
+                  </option>
+                  <option value="merge">merge</option>
+                  <option value="custom">
+                    função customizada: (local, remote) =&gt; any
+                  </option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="in-ttl">ttl do cache (ms)</label>
+                <input type="number" id="in-ttl" value="300000" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field checkbox">
+                <input type="checkbox" id="in-schema" />
+                <label for="in-schema"
+                  >ativar schema para a collection "users" (exige campo "email"
+                  válido)</label
+                >
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="primary" id="btn-init">
+                Inicializar (GistDB.create)
+              </button>
+            </div>
+          </div>
+
+          <!-- CRUD -->
+          <div class="panel locked" id="panelCrud">
+            <h2>02 · CRUD <span class="n">get · set · delete · list</span></h2>
+            <p class="desc">
+              Opera diretamente sobre a instância retornada por
+              <code>GistDB.create()</code>.
+            </p>
+
+            <div class="row">
+              <div class="field">
+                <label for="cr-collection">collection</label>
+                <input type="text" id="cr-collection" value="users" />
+              </div>
+              <div class="field">
+                <label for="cr-id">id</label>
+                <input type="text" id="cr-id" value="42" />
+              </div>
+            </div>
+            <div class="field" style="margin-bottom: 10px">
+              <label for="cr-data">data (JSON — usado em set())</label>
+              <textarea id="cr-data">
+{"name":"Ada Lovelace","email":"ada@example.com"}</textarea
+              >
+            </div>
+            <div class="row">
+              <div class="field checkbox">
+                <input type="checkbox" id="cr-offline" />
+                <label for="cr-offline"
+                  >simular offline durante o próximo set()
+                  (navigator.onLine=false)</label
+                >
+              </div>
+            </div>
+
+            <div class="actions">
+              <button id="btn-get">get(collection, id)</button>
+              <button class="primary" id="btn-set">
+                set(collection, id, data)
+              </button>
+              <button class="danger" id="btn-del">
+                delete(collection, id)
+              </button>
+              <button id="btn-list">list(collection)</button>
+            </div>
+          </div>
+
+          <!-- SYNC -->
+          <div class="panel locked" id="panelSync">
+            <h2>
+              03 · Sincronização <span class="n">sync · getLastSyncAt</span>
+            </h2>
+            <p class="desc">
+              <code>sync()</code> limpa o cache local e esvazia a fila de
+              escrita pendente do transporte.
+            </p>
+            <div class="actions">
+              <button class="primary" id="btn-sync">sync()</button>
+              <button id="btn-lastsync">getLastSyncAt()</button>
+            </div>
+          </div>
+
+          <!-- WATCH -->
+          <div class="panel locked" id="panelWatch">
+            <h2>04 · Observação <span class="n">watch()</span></h2>
+            <p class="desc">
+              Registra um callback e inicia polling na collection informada;
+              <code>watch()</code> retorna a própria função de
+              <code>unwatch</code>.
+            </p>
+            <div class="row">
+              <div class="field">
+                <label for="w-collection">collection</label>
+                <input type="text" id="w-collection" value="users" />
+              </div>
+              <div class="field">
+                <label for="w-interval">interval (ms)</label>
+                <input type="number" id="w-interval" value="15000" />
+              </div>
+            </div>
+            <div class="actions">
+              <button class="primary" id="btn-watch">
+                watch(collection, cb, interval)
+              </button>
+              <button class="danger" id="btn-unwatch" disabled>
+                unwatch()
+              </button>
+            </div>
+          </div>
+
+          <!-- DESTROY -->
+          <div class="panel locked" id="panelDestroy">
+            <h2>05 · Encerramento <span class="n">destroy()</span></h2>
+            <p class="desc">
+              Limpa timers de polling, observadores e o token guardado no
+              <code>KeyVault</code>.
+            </p>
+            <div class="actions">
+              <button class="danger" id="btn-destroy">destroy()</button>
+            </div>
+          </div>
+
+          <!-- ERROS -->
+          <div class="panel" id="panelErrors">
+            <h2>06 · Cenários de erro <span class="n">GistDBError</span></h2>
+            <p class="desc">
+              Dispara intencionalmente os caminhos de erro reais da classe, sem
+              precisar de instância válida.
+            </p>
+            <div class="actions">
+              <button id="btn-err-token">Provocar TOKEN_REQUIRED</button>
+              <button id="btn-err-prefix">Provocar PREFIX_REQUIRED</button>
+              <button id="btn-err-notinit">Provocar NOT_INITIALIZED</button>
+              <button id="btn-err-validation">Provocar VALIDATION_ERROR</button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="log-rail">
+          <h2>Log de commits (chamadas reais ao módulo)</h2>
+          <ol class="commit-log" id="logList">
+            <li class="log-empty" style="list-style: none">
+              Nenhuma chamada ainda — inicialize o GistDB ao lado.
+            </li>
+          </ol>
+        </aside>
       </div>
 
-      <div class="row">
-        <label>Criptografia</label> <input id="useEncryption" type="checkbox" />
-        <span class="muted">Habilitar criptografia</span>
-        <input
-          id="encPassword"
-          type="password"
-          placeholder="Senha de criptografia"
-          style="max-width: 220px; margin-left: 8px; display: none"
-        />
-      </div>
+      <section class="coverage">
+        <h2>Matriz de cobertura da API pública</h2>
+        <p class="desc">
+          Cada item abaixo só fica verde quando o método correspondente é
+          efetivamente chamado no módulo importado, com sucesso ou erro
+          esperado.
+        </p>
+        <div class="chip-grid" id="chipGrid"></div>
+      </section>
 
-      <div class="row">
-        <label>Collection</label
-        ><input id="collection" type="text" value="todos" />
-      </div>
-      <div class="row">
-        <label>ID</label><input id="id" type="text" value="1" />
-      </div>
-      <div class="row">
-        <label>Dados (JSON)</label
-        ><textarea id="data">
-{ "titulo": "comprar leite", "done": false }</textarea
-        >
-      </div>
-
-      <div class="actions">
-        <button id="btnSet">set()</button>
-        <button id="btnGet">get()</button>
-        <button id="btnDelete">delete()</button>
-        <button id="btnList">list()</button>
-        <button id="btnWatch" class="small">watch()</button>
-        <button id="btnSync" class="small">sync()</button>
-        <button id="btnClearCache" class="small">clear cache</button>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="panel">
-        <h3>Visão do ciclo</h3>
-        <div class="muted">Transporte</div>
-        <pre id="transportLog">(nenhuma operação ainda)</pre>
-        <div class="muted">Cache (sessionStorage)</div>
-        <pre id="cacheView">(vazio)</pre>
-      </div>
-      <div class="panel">
-        <h3>Dados — armazenados</h3>
-        <div class="muted">Representação no Gist (crua)</div>
-        <pre id="storedView">(vazio)</pre>
-        <div style="height: 8px"></div>
-        <div class="muted">Descriptografado (se aplicável)</div>
-        <pre id="decryptedView">(vazio)</pre>
-      </div>
-    </div>
-
-    <div class="panel">
-      <h3>Debug / Info</h3>
-      <div class="row">
-        <label>Resolver</label
-        ><select id="resolver">
-          <option value="last-write-wins">last-write-wins</option>
-          <option value="remote-wins">remote-wins</option>
-          <option value="local-wins">local-wins</option>
-        </select>
-      </div>
-      <div class="row">
-        <label>Status</label><span id="status">pronto</span>
-      </div>
+      <footer>
+        Consome <code>./dist/gistdb.min.js</code> (exports públicos:
+        <code>GistDB</code>, <code>Logger</code>). Nenhum trecho do módulo é
+        reescrito ou resumido nesta página — apenas chamado.
+      </footer>
     </div>
 
     <script type="module">
-      // Playground runtime: implementa operações principais em modo mock ou live.
+      import { GistDB, Logger } from './dist/gistdb.min.js';
 
-      const $ = (id) => document.getElementById(id);
-      const transportLog = [];
+      // expõe para inspeção manual no console do navegador durante a demo
+      window.__GistDB = GistDB;
+      window.__Logger = Logger;
 
-      function logTransport(msg) {
-        transportLog.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
-        $('transportLog').textContent = transportLog.join('\n');
+      /* ---------- cobertura da API pública ---------- */
+      const COVERAGE_ITEMS = [
+        {
+          id: 'create',
+          method: 'GistDB.create()',
+          desc: 'Factory assíncrono, ponto único de entrada.',
+        },
+        { id: 'get', method: 'db.get()', desc: 'Leitura com cache local.' },
+        {
+          id: 'set',
+          method: 'db.set()',
+          desc: 'Escrita com versionamento e resolução de conflito.',
+        },
+        {
+          id: 'del',
+          method: 'db.delete()',
+          desc: 'Remoção remota + invalidação de cache.',
+        },
+        {
+          id: 'list',
+          method: 'db.list()',
+          desc: 'Listagem com filtro opcional.',
+        },
+        {
+          id: 'sync',
+          method: 'db.sync()',
+          desc: 'Limpa cache e esvazia fila de escrita.',
+        },
+        {
+          id: 'lastSync',
+          method: 'db.getLastSyncAt()',
+          desc: 'Lê metadado de última sincronização.',
+        },
+        {
+          id: 'watch',
+          method: 'db.watch()',
+          desc: 'Assina mudanças via polling.',
+        },
+        {
+          id: 'unwatch',
+          method: 'unwatch() (retorno de watch)',
+          desc: 'Cancela assinatura e limpa o timer.',
+        },
+        {
+          id: 'destroy',
+          method: 'db.destroy()',
+          desc: 'Limpa timers, observadores e o KeyVault.',
+        },
+        {
+          id: 'errors',
+          method: 'GistDBError (via .code)',
+          desc: 'Caminhos de erro: token, prefix, validação, não-inicializado.',
+        },
+      ];
+      const coverage = Object.fromEntries(
+        COVERAGE_ITEMS.map((i) => [i.id, false]),
+      );
+
+      function renderCoverage() {
+        const grid = document.getElementById('chipGrid');
+        grid.innerHTML = '';
+        COVERAGE_ITEMS.forEach((item) => {
+          const done = coverage[item.id];
+          const chip = document.createElement('div');
+          chip.className = 'chip' + (done ? ' covered' : '');
+          chip.innerHTML = `
+      <div class="chip-top">
+        <span class="chip-method">${item.method}</span>
+        <span class="dot"></span>
+      </div>
+      <span class="chip-desc">${item.desc}</span>
+      <span class="chip-status">${done ? 'coberto' : 'pendente'}</span>
+    `;
+          grid.appendChild(chip);
+        });
+        const total = COVERAGE_ITEMS.length;
+        const done = Object.values(coverage).filter(Boolean).length;
+        const badge = document.getElementById('coverageBadge');
+        badge.textContent = `${done} / ${total} endpoints exercitados`;
+        badge.classList.toggle('full', done === total);
       }
-      function updateCacheView() {
-        const out = [];
-        for (let i = 0; i < sessionStorage.length; i++) {
-          const k = sessionStorage.key(i);
-          out.push(`${k}: ${sessionStorage.getItem(k)}`);
+      function markCovered(id) {
+        if (id in coverage) {
+          coverage[id] = true;
+          renderCoverage();
         }
-        $('cacheView').textContent = out.join('\n') || '(vazio)';
       }
-      function setStatus(s) {
-        $('status').textContent = s;
+      renderCoverage();
+
+      /* ---------- log estilo "git log" ---------- */
+      const logListEl = document.getElementById('logList');
+      function logEvent(status, method, detail) {
+        const empty = logListEl.querySelector('.log-empty');
+        if (empty) empty.remove();
+        const li = document.createElement('li');
+        li.className = status;
+        const ts = new Date().toLocaleTimeString('pt-BR');
+        li.innerHTML = `
+    <span class="cl-ts">${ts}</span>
+    <span class="cl-method">${method}</span>
+    <span class="cl-detail">${detail ?? ''}</span>
+  `;
+        logListEl.prepend(li);
+        while (logListEl.children.length > 60)
+          logListEl.removeChild(logListEl.lastChild);
       }
 
-      // CryptoManager JS (portado do src/CryptoManager.ts)
-      class CryptoManagerJS {
-        constructor(key, salt) {
-          this.key = key;
-          this._salt = salt;
+      function safeStringify(v) {
+        if (typeof v === 'string') return v;
+        try {
+          return JSON.stringify(v);
+        } catch {
+          return String(v);
         }
-        static async fromPassword(password, salt = null) {
-          const enc = new TextEncoder();
-          const cryptoObj = crypto;
-          const rawSalt = salt ?? cryptoObj.getRandomValues(new Uint8Array(32));
-          const baseKey = await cryptoObj.subtle.importKey(
-            'raw',
-            enc.encode(password),
-            'PBKDF2',
-            false,
-            ['deriveKey'],
-          );
-          const aesKey = await cryptoObj.subtle.deriveKey(
-            {
-              name: 'PBKDF2',
-              salt: rawSalt,
-              iterations: 310000,
-              hash: 'SHA-256',
-            },
-            baseKey,
-            { name: 'AES-GCM', length: 256 },
-            false,
-            ['encrypt', 'decrypt'],
-          );
-          return new CryptoManagerJS(aesKey, rawSalt);
-        }
-        static toB64(buf) {
-          return btoa(String.fromCharCode(...new Uint8Array(buf)));
-        }
-        static fromB64(s) {
-          return new Uint8Array([...atob(s)].map((c) => c.charCodeAt(0)));
-        }
-        async encrypt(obj) {
-          const iv = crypto.getRandomValues(new Uint8Array(12));
-          const enc = new TextEncoder();
-          const data = enc.encode(JSON.stringify(obj));
-          const buf = await crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv },
-            this.key,
-            data,
-          );
-          return {
-            __encrypted: true,
-            iv: CryptoManagerJS.toB64(iv),
-            ciphertext: CryptoManagerJS.toB64(new Uint8Array(buf)),
-            salt: CryptoManagerJS.toB64(this._salt),
+      }
+      const nativeWarn = console.warn.bind(console);
+      const nativeInfo = console.info.bind(console);
+      console.warn = (...args) => {
+        nativeWarn(...args);
+        logEvent('warn', '[console.warn]', args.map(safeStringify).join(' '));
+      };
+      console.info = (...args) => {
+        nativeInfo(...args);
+        logEvent('info', '[console.info]', args.map(safeStringify).join(' '));
+      };
+
+      function describeError(err) {
+        const code = err?.code ?? err?.name ?? 'Error';
+        const msg = err?.message ?? String(err);
+        return `${code}: ${msg}`;
+      }
+
+      /* ---------- estado ---------- */
+      let db = null;
+      let currentUnwatch = null;
+
+      function setLoading(btn, loading) {
+        btn.disabled = loading;
+      }
+      function unlockPanels() {
+        ['panelCrud', 'panelSync', 'panelWatch', 'panelDestroy'].forEach((id) =>
+          document.getElementById(id).classList.remove('locked'),
+        );
+      }
+      function lockPanels() {
+        ['panelCrud', 'panelSync', 'panelWatch', 'panelDestroy'].forEach((id) =>
+          document.getElementById(id).classList.add('locked'),
+        );
+      }
+
+      /* ---------- 01 · Inicialização ---------- */
+      const btnInit = document.getElementById('btn-init');
+      btnInit.addEventListener('click', async () => {
+        const token = document.getElementById('in-token').value.trim();
+        const prefix = document.getElementById('in-prefix').value.trim();
+        const gistId = document.getElementById('in-gistid').value.trim();
+        const password = document.getElementById('in-password').value;
+        const resolverChoice = document.getElementById('in-resolver').value;
+        const ttl =
+          Number(document.getElementById('in-ttl').value) || undefined;
+        const useSchema = document.getElementById('in-schema').checked;
+
+        const cfg = { token, prefix };
+        if (gistId) cfg.gistId = gistId;
+        if (password) cfg.password = password;
+        if (ttl) cfg.ttl = ttl;
+        if (useSchema) {
+          cfg.schema = {
+            users: (data) =>
+              typeof data?.email === 'string' && data.email.includes('@'),
           };
         }
-        async decrypt(p) {
-          if (!p?.__encrypted) return p;
-          const iv = CryptoManagerJS.fromB64(p.iv);
-          const ct = CryptoManagerJS.fromB64(p.ciphertext);
-          const buf = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv },
-            this.key,
-            ct,
+        cfg.conflictResolver =
+          resolverChoice === 'merge'
+            ? 'merge'
+            : resolverChoice === 'custom'
+              ? (local, remote) => ({
+                  ...remote,
+                  ...local,
+                  _mergedBy: 'demo-custom-resolver',
+                })
+              : 'last-write-wins';
+
+        setLoading(btnInit, true);
+        try {
+          db = await GistDB.create(cfg);
+          markCovered('create');
+          logEvent(
+            'ok',
+            'GistDB.create()',
+            `prefix="${prefix}" gistId=${gistId || '(novo, gerado agora)'} resolver=${resolverChoice}`,
           );
-          return JSON.parse(new TextDecoder().decode(buf));
+          unlockPanels();
+        } catch (err) {
+          logEvent('err', 'GistDB.create()', describeError(err));
+          if (err?.code) markCovered('errors');
+          lockPanels();
+        } finally {
+          setLoading(btnInit, false);
         }
-      }
+      });
 
-      // Simple resolver
-      function resolvePayload(strategy, local, remote) {
-        if (!remote) return local;
-        if (!local) return remote;
-        if (strategy === 'last-write-wins') {
-          const lt = new Date(local._updatedAt || 0).getTime();
-          const rt = new Date(remote._updatedAt || 0).getTime();
-          return lt >= rt ? local : remote;
-        }
-        if (strategy === 'remote-wins') return remote;
-        if (strategy === 'local-wins') return local;
-        return local;
-      }
-
-      // Live transport using GitHub Gist API
-      async function gistApiRequest(token, method, path, body = null) {
-        if (!token) throw new Error('Token ausente');
-        const opts = {
-          method,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json',
-          },
-        };
-        if (body !== null) opts.body = JSON.stringify(body);
-        const res = await fetch('https://api.github.com' + path, opts);
-        if (!res.ok) {
-          const txt = await res.text().catch(() => res.statusText);
-          throw new Error(`GitHub API ${res.status}: ${txt}`);
-        }
-        if (res.status === 204) return true;
-        return res.json();
-      }
-
-      async function initGistLive(token, prefix, existingGistId) {
-        // find or create
-        if (existingGistId) return existingGistId;
-        const gists = await gistApiRequest(token, 'GET', '/gists?per_page=100');
-        const found = gists.find((g) => g.description === `gistdb:${prefix}`);
-        if (found) return found.id;
-        const created = await gistApiRequest(token, 'POST', '/gists', {
-          description: `gistdb:${prefix}`,
-          public: false,
-          files: {},
+      /* ---------- 02 · CRUD ---------- */
+      document
+        .getElementById('btn-get')
+        .addEventListener('click', async (e) => {
+          const collection = document
+            .getElementById('cr-collection')
+            .value.trim();
+          const id = document.getElementById('cr-id').value.trim();
+          setLoading(e.target, true);
+          try {
+            const data = await db.get(collection, id);
+            markCovered('get');
+            logEvent(
+              'ok',
+              'db.get()',
+              data ? safeStringify(data) : '(sem registro para este id)',
+            );
+          } catch (err) {
+            logEvent('err', 'db.get()', describeError(err));
+          } finally {
+            setLoading(e.target, false);
+          }
         });
-        return created.id;
-      }
 
-      async function getFileLive(token, gistId, filename) {
-        const gist = await gistApiRequest(token, 'GET', `/gists/${gistId}`);
-        if (!gist.files || !gist.files[filename]) return null;
-        try {
-          return JSON.parse(gist.files[filename].content);
-        } catch {
-          return null;
-        }
-      }
-      async function putFileLive(token, gistId, filename, data) {
-        const content = JSON.stringify(data, null, 2);
-        await gistApiRequest(token, 'PATCH', `/gists/${gistId}`, {
-          files: { [filename]: { content } },
-        });
-      }
-      async function deleteFileLive(token, gistId, filename) {
-        await gistApiRequest(token, 'PATCH', `/gists/${gistId}`, {
-          files: { [filename]: null },
-        });
-      }
-      async function listFilesLive(token, gistId, collection) {
-        const gist = await gistApiRequest(token, 'GET', `/gists/${gistId}`);
-        if (!gist.files) return [];
-        return Object.entries(gist.files)
-          .filter(([n]) => n.includes(`_${collection}_`))
-          .map(([, f]) => {
+      document
+        .getElementById('btn-set')
+        .addEventListener('click', async (e) => {
+          const collection = document
+            .getElementById('cr-collection')
+            .value.trim();
+          const id = document.getElementById('cr-id').value.trim();
+          const raw = document.getElementById('cr-data').value;
+          const offline = document.getElementById('cr-offline').checked;
+
+          let payload;
+          try {
+            payload = JSON.parse(raw);
+          } catch {
+            logEvent(
+              'warn',
+              'set() — JSON inválido',
+              'corrija o campo "data" antes de enviar',
+            );
+            return;
+          }
+
+          let restoreOnline = null;
+          if (offline && typeof navigator !== 'undefined') {
             try {
-              return JSON.parse(f.content);
+              Object.defineProperty(navigator, 'onLine', {
+                value: false,
+                configurable: true,
+              });
+              restoreOnline = () =>
+                Object.defineProperty(navigator, 'onLine', {
+                  value: true,
+                  configurable: true,
+                });
             } catch {
-              return null;
+              /* alguns navegadores não permitem redefinir; segue sem simular */
             }
-          })
-          .filter(Boolean);
-      }
+          }
 
-      // Mock transport: uses sessionStorage as backing store under key "mock_gist_files"
-      function getMockFiles() {
-        try {
-          const raw = sessionStorage.getItem('mock_gist_files');
-          return raw ? JSON.parse(raw) : {};
-        } catch {
-          return {};
-        }
-      }
-      function saveMockFiles(files) {
-        sessionStorage.setItem('mock_gist_files', JSON.stringify(files));
-      }
-      async function getFileMock(filename) {
-        const files = getMockFiles();
-        if (!files[filename]) return null;
-        try {
-          return JSON.parse(files[filename]);
-        } catch {
-          return null;
-        }
-      }
-      async function putFileMock(filename, data) {
-        const files = getMockFiles();
-        files[filename] = JSON.stringify(data, null, 2);
-        saveMockFiles(files);
-      }
-      async function deleteFileMock(filename) {
-        const files = getMockFiles();
-        delete files[filename];
-        saveMockFiles(files);
-      }
-      async function listFilesMock(collection) {
-        const files = getMockFiles();
-        return Object.entries(files)
-          .filter(([n]) => n.includes(`_${collection}_`))
-          .map(([, c]) => {
-            try {
-              return JSON.parse(c);
-            } catch {
-              return null;
-            }
-          })
-          .filter(Boolean);
-      }
-
-      // Playground logic
-      let watcherUnsub = null;
-      let cryptoInstance = null;
-      let gistdbInstance = null;
-      let gistdbConfig = null; // { token, prefix, gistId, password }
-
-      async function getCurrentCrypto() {
-        if (!$('useEncryption').checked) return null;
-        const pwd = $('encPassword').value || prompt('Senha de criptografia:');
-        if (!pwd) throw new Error('Senha necessária');
-        if (!cryptoInstance || cryptoInstance._pwd !== pwd) {
-          cryptoInstance = await CryptoManagerJS.fromPassword(pwd);
-          cryptoInstance._pwd = pwd;
-        }
-        return cryptoInstance;
-      }
-
-      function filename(col, id) {
-        return `gistdb_${$('prefix').value || 'app'}_${col}_${id}.json`;
-      }
-
-      async function ensureGistDB() {
-        // cria ou retorna instância existente se config igual
-        const token = $('token').value.trim();
-        const prefix = $('prefix').value.trim();
-        const gistIdVal = $('gistId').value.trim() || null;
-        const pwd = $('useEncryption').checked
-          ? $('encPassword').value || null
-          : null;
-        const cfg = { token, prefix, gistId: gistIdVal, password: pwd };
-        if (
-          gistdbInstance &&
-          JSON.stringify(cfg) === JSON.stringify(gistdbConfig)
-        )
-          return gistdbInstance;
-        // import bundle
-        try {
-          const mod = await import('./dist/gistdb.min.js');
-          const { GistDB } = mod;
-          gistdbInstance = await GistDB.create({
-            token,
-            prefix,
-            gistId: gistIdVal,
-            password: pwd,
-          });
-          gistdbConfig = cfg;
-          // try to resolve gistId for UI by querying gists with same prefix
+          setLoading(e.target, true);
           try {
-            const gid = await initGistLive(token, prefix, gistIdVal);
-            if (gid) $('gistId').value = gid;
-          } catch (e) {}
-          logTransport('GistDB instance inicializada (dist)');
-          return gistdbInstance;
-        } catch (err) {
-          logTransport('Erro ao importar dist/gistdb.min.js: ' + err.message);
-          throw err;
-        }
-      }
+            const result = await db.set(collection, id, payload);
+            markCovered('set');
+            if (offline)
+              logEvent(
+                'info',
+                'set() offline simulado',
+                'leitura remota pulada antes da escrita',
+              );
+            logEvent('ok', 'db.set()', safeStringify(result));
+          } catch (err) {
+            logEvent('err', 'db.set()', describeError(err));
+            if (err?.code === 'VALIDATION_ERROR') markCovered('errors');
+          } finally {
+            if (restoreOnline) restoreOnline();
+            setLoading(e.target, false);
+          }
+        });
 
-      async function doSet() {
-        try {
-          setStatus('set em andamento');
-          const mode = $('mode').value;
-          const col = $('collection').value;
-          const id = $('id').value;
-          const payload = JSON.parse($('data').value);
-          if (mode === 'mock') {
-            const entry = {
-              ...payload,
-              _id: id,
-              _version: 'v1',
-              _updatedAt: new Date().toISOString(),
-            };
-            const cm = await getCurrentCrypto().catch(() => null);
-            let toStore = entry;
-            if (cm) {
-              toStore = await cm.encrypt(entry);
-            }
-            await putFileMock(filename(col, id), toStore);
-            logTransport(`mock.putFile ${filename(col, id)}`);
-            sessionStorage.setItem(
-              `play:cache:${col}:${id}`,
-              JSON.stringify(entry),
-            );
-          } else {
-            const db = await ensureGistDB();
-            await db.set(col, id, payload);
-            logTransport(`live.set -> GistDB.set ${col}/${id}`);
-            sessionStorage.setItem(
-              `play:cache:${col}:${id}`,
-              JSON.stringify({
-                ...payload,
-                _id: id,
-                _updatedAt: new Date().toISOString(),
-              }),
-            );
-          }
-          updateCacheView();
-          await refreshStoredView();
-          setStatus('ok');
-        } catch (err) {
-          setStatus('erro: ' + err.message);
-          console.error(err);
-        }
-      }
-
-      async function doGet() {
-        try {
-          setStatus('get em andamento');
-          const mode = $('mode').value;
-          const col = $('collection').value;
-          const id = $('id').value;
-          let raw = null;
-          if (mode === 'mock') {
-            raw = await getFileMock(filename(col, id));
-            logTransport(`mock.getFile ${filename(col, id)}`);
-          } else {
-            const db = await ensureGistDB();
-            const data = await db.get(col, id);
-            raw = data;
-            logTransport(`live.get -> GistDB.get ${col}/${id}`);
-          }
-          $('storedView').textContent = raw
-            ? JSON.stringify(raw, null, 2)
-            : '(null)'; // decrypted view already handled by GistDB for live
-          const cm = await getCurrentCrypto().catch(() => null);
-          if (cm && raw && raw.__encrypted) {
-            const dec = await cm.decrypt(raw);
-            $('decryptedView').textContent = JSON.stringify(dec, null, 2);
-          } else if (raw) {
-            $('decryptedView').textContent = JSON.stringify(raw, null, 2);
-          } else {
-            $('decryptedView').textContent = '(null)';
-          }
-          setStatus('ok');
-        } catch (err) {
-          setStatus('erro: ' + err.message);
-          console.error(err);
-        }
-      }
-
-      async function doDelete() {
-        try {
-          setStatus('delete em andamento');
-          const mode = $('mode').value;
-          const col = $('collection').value;
-          const id = $('id').value;
-          if (mode === 'mock') {
-            await deleteFileMock(filename(col, id));
-            logTransport(`mock.deleteFile ${filename(col, id)}`);
-            sessionStorage.removeItem(`play:cache:${col}:${id}`);
-          } else {
-            const db = await ensureGistDB();
-            await db.delete(col, id);
-            logTransport(`live.delete -> GistDB.delete ${col}/${id}`);
-            sessionStorage.removeItem(`play:cache:${col}:${id}`);
-          }
-          updateCacheView();
-          await refreshStoredView();
-          setStatus('ok');
-        } catch (err) {
-          setStatus('erro: ' + err.message);
-          console.error(err);
-        }
-      }
-
-      async function doList() {
-        try {
-          setStatus('list em andamento');
-          const mode = $('mode').value;
-          const col = $('collection').value;
-          let out = null;
-          if (mode === 'mock') {
-            out = await listFilesMock(col);
-            logTransport(`mock.listFiles ${col}`);
-          } else {
-            const db = await ensureGistDB();
-            out = await db.list(col);
-            logTransport(`live.list -> GistDB.list ${col}`);
-          }
-          $('storedView').textContent = JSON.stringify(out, null, 2); // if encrypted, attempt decrypt
-          const cm = await getCurrentCrypto().catch(() => null);
-          if (cm) {
-            const dec = [];
-            for (const r of out) {
-              if (r && r.__encrypted) {
-                try {
-                  dec.push(await cm.decrypt(r));
-                } catch (e) {
-                  dec.push({ error: 'decrypt failed' });
-                }
-              } else dec.push(r);
-            }
-            $('decryptedView').textContent = JSON.stringify(dec, null, 2);
-          } else {
-            $('decryptedView').textContent =
-              '(use encryption to see decrypted)';
-          }
-          setStatus('ok');
-        } catch (err) {
-          setStatus('erro: ' + err.message);
-          console.error(err);
-        }
-      }
-
-      async function doSync() {
-        try {
-          setStatus('sync em andamento'); // clear cache
-          const keys = [];
-          for (let i = 0; i < sessionStorage.length; i++) {
-            keys.push(sessionStorage.key(i));
-          }
-          keys
-            .filter((k) => k?.startsWith('play:cache:'))
-            .forEach((k) => sessionStorage.removeItem(k));
-          updateCacheView();
-          logTransport('cache cleared');
-          setStatus('ok');
-        } catch (err) {
-          setStatus('erro: ' + err.message);
-        }
-      }
-
-      async function refreshStoredView() {
-        const mode = $('mode').value;
-        const col = $('collection').value;
-        const id = $('id').value;
-        let raw = null;
-        if (mode === 'mock') raw = await getFileMock(filename(col, id));
-        else {
-          // try to fetch raw gist file for preview
-          const token = $('token').value.trim();
-          const gid = $('gistId').value.trim();
+      document
+        .getElementById('btn-del')
+        .addEventListener('click', async (e) => {
+          const collection = document
+            .getElementById('cr-collection')
+            .value.trim();
+          const id = document.getElementById('cr-id').value.trim();
+          setLoading(e.target, true);
           try {
-            raw = await getFileLive(token, gid, filename(col, id));
-          } catch (e) {
-            raw = null;
+            await db.delete(collection, id);
+            markCovered('del');
+            logEvent('ok', 'db.delete()', `${collection}/${id} removido`);
+          } catch (err) {
+            logEvent('err', 'db.delete()', describeError(err));
+          } finally {
+            setLoading(e.target, false);
           }
-        }
-        $('storedView').textContent = raw
-          ? JSON.stringify(raw, null, 2)
-          : '(null)';
-        const cm = await getCurrentCrypto().catch(() => null);
-        if (cm && raw && raw.__encrypted) {
+        });
+
+      document
+        .getElementById('btn-list')
+        .addEventListener('click', async (e) => {
+          const collection = document
+            .getElementById('cr-collection')
+            .value.trim();
+          setLoading(e.target, true);
           try {
-            $('decryptedView').textContent = JSON.stringify(
-              await cm.decrypt(raw),
-              null,
-              2,
-            );
-          } catch (e) {
-            $('decryptedView').textContent = '(decrypt failed)';
+            const items = await db.list(collection);
+            markCovered('list');
+            logEvent('ok', 'db.list()', `${items.length} item(ns)`);
+          } catch (err) {
+            logEvent('err', 'db.list()', describeError(err));
+          } finally {
+            setLoading(e.target, false);
           }
-        } else if (raw) {
-          $('decryptedView').textContent = JSON.stringify(raw, null, 2);
-        } else {
-          $('decryptedView').textContent = '(null)';
-        }
-      }
+        });
 
-      // UI wiring
-      $('mode').addEventListener('change', (e) => {
-        const v = e.target.value;
-        $('modeBadge').textContent = v === 'mock' ? 'Mock' : 'Live';
-        $('modeBadge').className =
-          'badge ' + (v === 'mock' ? 'badge-mock' : 'badge-live');
-        $('liveOptions').style.display = v === 'live' ? 'block' : 'none';
-      });
-      $('useEncryption').addEventListener('change', (e) => {
-        $('encPassword').style.display = e.target.checked
-          ? 'inline-block'
-          : 'none';
-      });
-      $('btnSet').addEventListener('click', doSet);
-      $('btnGet').addEventListener('click', doGet);
-      $('btnDelete').addEventListener('click', doDelete);
-      $('btnList').addEventListener('click', doList);
-      $('btnSync').addEventListener('click', doSync);
-      $('btnClearCache').addEventListener('click', () => {
-        // remove mock files too
-        for (let i = 0; i < sessionStorage.length; i++) {
-          const k = sessionStorage.key(i);
-          if (k && (k.startsWith('play:cache:') || k === 'mock_gist_files'))
-            sessionStorage.removeItem(k);
+      /* ---------- 03 · Sincronização ---------- */
+      document
+        .getElementById('btn-sync')
+        .addEventListener('click', async (e) => {
+          setLoading(e.target, true);
+          try {
+            const r = await db.sync();
+            markCovered('sync');
+            logEvent('ok', 'db.sync()', safeStringify(r));
+          } catch (err) {
+            logEvent('err', 'db.sync()', describeError(err));
+          } finally {
+            setLoading(e.target, false);
+          }
+        });
+
+      document
+        .getElementById('btn-lastsync')
+        .addEventListener('click', async (e) => {
+          setLoading(e.target, true);
+          try {
+            const at = await db.getLastSyncAt();
+            markCovered('lastSync');
+            logEvent(
+              'ok',
+              'db.getLastSyncAt()',
+              at ?? '(nunca sincronizado nesta sessão de cache)',
+            );
+          } catch (err) {
+            logEvent('err', 'db.getLastSyncAt()', describeError(err));
+          } finally {
+            setLoading(e.target, false);
+          }
+        });
+
+      /* ---------- 04 · Watch ---------- */
+      const btnWatch = document.getElementById('btn-watch');
+      const btnUnwatch = document.getElementById('btn-unwatch');
+
+      btnWatch.addEventListener('click', () => {
+        const collection = document.getElementById('w-collection').value.trim();
+        const interval =
+          Number(document.getElementById('w-interval').value) || 15000;
+        try {
+          currentUnwatch = db.watch(
+            collection,
+            (id, data) => {
+              logEvent(
+                'info',
+                'watch() callback',
+                `${collection}/${id} → ${data ? safeStringify(data) : 'removido'}`,
+              );
+            },
+            interval,
+          );
+          markCovered('watch');
+          logEvent(
+            'ok',
+            'db.watch()',
+            `observando "${collection}" a cada ${interval}ms`,
+          );
+          btnWatch.disabled = true;
+          btnUnwatch.disabled = false;
+        } catch (err) {
+          logEvent('err', 'db.watch()', describeError(err));
         }
-        updateCacheView();
-        logTransport('cleared play cache and mock files');
       });
 
-      // watch emulation: toggles subscribe
-      $('btnWatch').addEventListener('click', () => {
-        if (watcherUnsub) {
-          watcherUnsub();
-          watcherUnsub = null;
-          $('btnWatch').textContent = 'watch()';
-          logTransport('watch unsubscribed');
-          return;
+      btnUnwatch.addEventListener('click', () => {
+        if (currentUnwatch) {
+          currentUnwatch();
+          markCovered('unwatch');
+          logEvent(
+            'ok',
+            'unwatch()',
+            'assinatura cancelada, timer de polling limpo',
+          );
+          currentUnwatch = null;
+          btnWatch.disabled = false;
+          btnUnwatch.disabled = true;
         }
-        // create watcher that logs
-        watcherUnsub = function () {
-          watcherUnsub = null;
-          logTransport('watch unsubscribed');
-        };
-        $('btnWatch').textContent = 'unwatch()';
-        logTransport('watch subscribed (simulado)');
       });
 
-      // initial
-      updateCacheView();
-      setStatus('pronto');
+      /* ---------- 05 · Destroy ---------- */
+      document.getElementById('btn-destroy').addEventListener('click', () => {
+        if (!db) return;
+        try {
+          db.destroy();
+          markCovered('destroy');
+          logEvent(
+            'ok',
+            'db.destroy()',
+            'timers, observadores e KeyVault limpos',
+          );
+          db = null;
+          currentUnwatch = null;
+          btnWatch.disabled = false;
+          btnUnwatch.disabled = true;
+          lockPanels();
+        } catch (err) {
+          logEvent('err', 'db.destroy()', describeError(err));
+        }
+      });
+
+      /* ---------- 06 · Cenários de erro ---------- */
+      document
+        .getElementById('btn-err-token')
+        .addEventListener('click', async () => {
+          try {
+            await GistDB.create({ prefix: 'demo-sem-token' });
+            logEvent(
+              'warn',
+              'GistDB.create() sem token',
+              'nenhum erro foi lançado — comportamento inesperado',
+            );
+          } catch (err) {
+            markCovered('errors');
+            logEvent('err', 'GistDB.create() sem token', describeError(err));
+          }
+        });
+
+      document
+        .getElementById('btn-err-prefix')
+        .addEventListener('click', async () => {
+          try {
+            await GistDB.create({ token: 'token-fake-para-teste' });
+            logEvent(
+              'warn',
+              'GistDB.create() sem prefix',
+              'nenhum erro foi lançado — comportamento inesperado',
+            );
+          } catch (err) {
+            markCovered('errors');
+            logEvent('err', 'GistDB.create() sem prefix', describeError(err));
+          }
+        });
+
+      document
+        .getElementById('btn-err-notinit')
+        .addEventListener('click', async () => {
+          try {
+            const raw = new GistDB(); // instanciação direta, fora da factory recomendada
+            await raw.get('users', '1');
+            logEvent(
+              'warn',
+              'new GistDB() sem create()',
+              'nenhum erro foi lançado — comportamento inesperado',
+            );
+          } catch (err) {
+            markCovered('errors');
+            logEvent('err', 'new GistDB() sem create()', describeError(err));
+          }
+        });
+
+      document
+        .getElementById('btn-err-validation')
+        .addEventListener('click', async () => {
+          if (!db) {
+            logEvent(
+              'warn',
+              'VALIDATION_ERROR',
+              'inicialize o GistDB com o schema ativado antes de testar isto',
+            );
+            return;
+          }
+          try {
+            await db.set('users', 'usuario-invalido', { name: 'sem email' });
+            logEvent(
+              'warn',
+              'db.set() com dado inválido',
+              'nenhum erro foi lançado — schema pode estar desativado',
+            );
+          } catch (err) {
+            markCovered('errors');
+            logEvent('err', 'db.set() com dado inválido', describeError(err));
+          }
+        });
     </script>
   </body>
 </html>
