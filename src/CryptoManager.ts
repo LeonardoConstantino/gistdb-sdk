@@ -63,6 +63,7 @@ export class CryptoManager {
    * Criptografa um objeto JS.
    */
   async encrypt(plainObject: any): Promise<EncryptedPayload> {
+    const startTime = Date.now();
     const cryptoObj =
       typeof crypto !== 'undefined' ? crypto : (globalThis as any).crypto;
     const iv = cryptoObj.getRandomValues(new Uint8Array(12));
@@ -74,6 +75,9 @@ export class CryptoManager {
       this.#key,
       encoded,
     );
+
+    const durationMs = Date.now() - startTime;
+    Logger.debug('CryptoManager', 'Payload AES-GCM Encrypted', { durationMs, sizeBytes: encoded.length });
 
     return {
       __encrypted: true,
@@ -89,6 +93,7 @@ export class CryptoManager {
   async decrypt(payload: any): Promise<any> {
     if (!payload?.__encrypted) return payload;
 
+    const startTime = Date.now();
     const cryptoObj =
       typeof crypto !== 'undefined' ? crypto : (globalThis as any).crypto;
     const iv = CryptoManager.#fromBase64(payload.iv);
@@ -101,10 +106,13 @@ export class CryptoManager {
         ciphertext,
       );
       const dec = new TextDecoder();
+      const durationMs = Date.now() - startTime;
+      Logger.debug('CryptoManager', 'Payload AES-GCM Decrypted', { durationMs, ciphertextLength: ciphertext.length });
       return JSON.parse(dec.decode(plainBuffer));
     } catch (err) {
-      // Log structured info to aid debugging (no plaintext password)
-      Logger.debug('CryptoManager', 'decrypt failed', {
+      const durationMs = Date.now() - startTime;
+      Logger.warn('CryptoManager', 'decrypt failed', {
+        durationMs,
         ivLength: iv?.length ?? null,
         ciphertextLength: ciphertext?.length ?? null,
         hasSalt: !!payload?.salt,

@@ -1,4 +1,5 @@
 import { GistDBError } from './errors.js';
+import { Logger } from './Logger.js';
 
 const GITHUB_API = 'https://api.github.com';
 
@@ -66,7 +67,20 @@ export class GistAPI {
 
     if (body !== null) opts.body = JSON.stringify(body);
 
-    const res = await fetch(`${GITHUB_API}${path}`, opts);
+    const startTime = Date.now();
+    Logger.debug('GistAPI', `HTTP Request ${method} ${path}`);
+
+    let res: Response;
+    try {
+      res = await fetch(`${GITHUB_API}${path}`, opts);
+    } catch (err: any) {
+      const durationMs = Date.now() - startTime;
+      Logger.error('GistAPI', `HTTP Request Failed: ${method} ${path}`, { durationMs, error: err?.message || String(err) });
+      throw err;
+    }
+
+    const durationMs = Date.now() - startTime;
+    Logger.info('GistAPI', `HTTP Response ${method} ${path} -> ${res.status}`, { durationMs, status: res.status });
 
     if (res.status === 404) return null;
     if (res.status === 422)

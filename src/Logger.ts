@@ -1,5 +1,17 @@
 export type LogLevel = 'none' | 'error' | 'warn' | 'info' | 'debug';
 
+export interface LogRecord {
+  ts: string;
+  module: string;
+  level: LogLevel;
+  message: string;
+  traceId?: string;
+  durationMs?: number;
+  meta?: any;
+}
+
+export type LogHandler = (record: LogRecord) => void;
+
 const LEVELS: Record<LogLevel, number> = {
   none: 0,
   error: 1,
@@ -8,58 +20,141 @@ const LEVELS: Record<LogLevel, number> = {
   debug: 4,
 };
 
+function sanitize(obj: any): any {
+  if (!obj || typeof obj !== 'object') {
+    if (typeof obj === 'string') {
+      return obj.replace(/(ghp_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,}_[A-Za-z0-9_]{59})/g, '[REDACTED_TOKEN]');
+    }
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(sanitize);
+  }
+
+  const clean: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey.includes('token') || lowerKey.includes('password') || lowerKey.includes('secret')) {
+      clean[key] = '[REDACTED]';
+    } else {
+      clean[key] = sanitize(val);
+    }
+  }
+  return clean;
+}
+
 class LoggerClass {
   private enabled = false;
   private level: LogLevel = 'warn';
+  private handlers = new Set<LogHandler>();
+  private activeTimers = new Map<string, number>();
 
   enable(level: LogLevel = 'debug') {
     this.enabled = true;
     this.level = level;
   }
+
   disable() {
     this.enabled = false;
   }
+
   isEnabled() {
     return this.enabled;
   }
 
+  setLevel(level: LogLevel) {
+    this.level = level;
+  }
+
+  subscribe(handler: LogHandler): () => void {
+    this.handlers.add(handler);
+    return () => this.handlers.delete(handler);
+  }
+
+  clearSubscribers() {
+    this.handlers.clear();
+  }
+
+  createTraceId(): string {
+    return 'tr_' + Math.random().toString(36).substring(2, 9);
+  }
+
+  time(label: string) {
+    this.activeTimers.set(label, Date.now());
+  }
+
+  timeEnd(module: string, label: string, message: string, meta?: any): number | undefined {
+    const start = this.activeTimers.get(label);
+    if (!start) return undefined;
+    const durationMs = Date.now() - start;
+    this.activeTimers.delete(label);
+    this.info(module, `${message} (${durationMs}ms)`, { ...meta, durationMs });
+    return durationMs;
+  }
+
   private shouldLog(lvl: LogLevel) {
-    if (!this.enabled) return false;
+    if (!this.enabled && this.handlers.size === 0) return false;
     return LEVELS[lvl] <= LEVELS[this.level];
   }
 
-  private fmt(module: string, level: LogLevel, message: string, meta?: any) {
-    const out: any = {
-      ts: new Date().toISOString(),
-      module,
-      level,
-      message,
+  private emit(record: LogRecord) {
+    const sanitizedRecord = {
+      ...record,
+      message: sanitize(record.message),
+      meta: record.meta !== undefined ? sanitize(record.meta) : undefined,
     };
-    if (meta !== undefined) out.meta = meta;
-    return out;
+
+    // Notifica os handlers customizados
+    this.handlers.forEach((h) => {
+      try {
+        h(sanitizedRecord);
+      } catch {}
+    });
+
+    // Output para console apenas se habilitado ativamente
+    if (this.enabled) {
+      const json = JSON.stringify(sanitizedRecord);
+      switch (record.level) {
+        case 'error':
+          console.error(json);
+          break;
+        case 'warn':
+          console.warn(json);
+          break;
+        case 'info':
+          console.info(json);
+          break;
+        case 'debug':
+          console.debug(json);
+          break;
+      }
+    }
   }
 
-  error(module: string, message: string, meta?: any) {
+  error(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('error')) return;
-    console.error(JSON.stringify(this.fmt(module, 'error', message, meta)));
+    this.emit({ ts: new Date().toISOString(), module, level: 'error', message, meta, traceId });
   }
-  warn(module: string, message: string, meta?: any) {
+
+  warn(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('warn')) return;
-    console.warn(JSON.stringify(this.fmt(module, 'warn', message, meta)));
+    this.emit({ ts: new Date().toISOString(), module, level: 'warn', message, meta, traceId });
   }
-  info(module: string, message: string, meta?: any) {
+
+  info(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('info')) return;
-    console.info(JSON.stringify(this.fmt(module, 'info', message, meta)));
+    this.emit({ ts: new Date().toISOString(), module, level: 'info', message, meta, traceId });
   }
-  debug(module: string, message: string, meta?: any) {
+
+  debug(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('debug')) return;
-    console.debug(JSON.stringify(this.fmt(module, 'debug', message, meta)));
+    this.emit({ ts: new Date().toISOString(), module, level: 'debug', message, meta, traceId });
   }
 }
 
 export const Logger = new LoggerClass();
 
-// Optional automatic enabling via global flag for quick dev use
 try {
   // @ts-ignore
   const g = typeof globalThis !== 'undefined' ? (globalThis as any) : null;

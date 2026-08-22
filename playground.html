@@ -860,6 +860,14 @@
         logEvent('info', '[console.info]', args.map(safeStringify).join(' '));
       };
 
+      // Assina diretamente os logs e telemetria emitidos pelo SDK
+      Logger.subscribe((rec) => {
+        const traceStr = rec.traceId ? ` [${rec.traceId}]` : '';
+        const durStr = rec.durationMs !== undefined ? ` (${rec.durationMs}ms)` : '';
+        const metaStr = rec.meta !== undefined ? ` ${safeStringify(rec.meta)}` : '';
+        logEvent(rec.level, `[${rec.module}]${traceStr}`, `${rec.message}${durStr}${metaStr}`);
+      });
+
       function describeError(err) {
         const code = err?.code ?? err?.name ?? 'Error';
         const msg = err?.message ?? String(err);

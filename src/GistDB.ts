@@ -11,6 +11,7 @@ import { KeyVault } from './KeyVault.js';
 import { GistDBError } from './errors.js';
 import { DeviceIdentity } from './DeviceIdentity.js';
 import { DeviceInfo } from './types.js';
+import { Logger } from './Logger.js';
 
 
 export class GistDB {
@@ -131,16 +132,31 @@ export class GistDB {
 
   async get(collection: string, id: string): Promise<any> {
     this.#assertReady();
+    const traceId = Logger.createTraceId();
+    const startTime = Date.now();
+    Logger.debug('GistDB', `get() initiated for ${collection}/${id}`, undefined, traceId);
+
     const cacheKey = this.#key(collection, id);
 
     const cached = await this.#cache!.read(cacheKey);
-    if (cached) return cached.data;
+    if (cached) {
+      const durationMs = Date.now() - startTime;
+      Logger.info('GistDB', `get() resolved via cache for ${collection}/${id}`, { durationMs, fromCache: true }, traceId);
+      return cached.data;
+    }
 
     const raw = await this.#transport!.getFile(this.#filename(collection, id));
-    if (!raw) return null;
+    if (!raw) {
+      const durationMs = Date.now() - startTime;
+      Logger.info('GistDB', `get() record not found for ${collection}/${id}`, { durationMs, found: false }, traceId);
+      return null;
+    }
 
     const data = await this.#maybeDecrypt(raw);
     await this.#cache!.write(cacheKey, data, raw._version);
+
+    const durationMs = Date.now() - startTime;
+    Logger.info('GistDB', `get() resolved via remote for ${collection}/${id}`, { durationMs, fromCache: false, version: raw._version }, traceId);
     return data;
   }
 
@@ -151,6 +167,10 @@ export class GistDB {
   ): Promise<{ id: string; version: string; updatedAt: string }> {
     this.#assertReady();
     this.#validate(collection, data);
+
+    const traceId = Logger.createTraceId();
+    const startTime = Date.now();
+    Logger.debug('GistDB', `set() initiated for ${collection}/${id}`, undefined, traceId);
 
     const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
@@ -179,12 +199,11 @@ export class GistDB {
       try {
         remoteDecrypted = await this.#maybeDecrypt(remote);
       } catch (err) {
-        // proteção adicional: se algo falhar na descriptografia, logamos e
-        // prosseguimos usando o payload remoto bruto para não bloquear a operação.
-        // eslint-disable-next-line no-console
-        console.warn(
-          'GistDB.set: falha ao descriptografar remote, usando payload bruto',
+        Logger.warn(
+          'GistDB',
+          'set: falha ao descriptografar remote, usando payload bruto',
           err,
+          traceId,
         );
         remoteDecrypted = remote;
       }
@@ -201,6 +220,10 @@ export class GistDB {
     await this.#cache!.write(this.#key(collection, id), resolved, version);
 
     this.#notifyWatchers(collection, id, resolved);
+
+    const durationMs = Date.now() - startTime;
+    Logger.info('GistDB', `set() completed for ${collection}/${id}`, { durationMs, version, isOnline }, traceId);
+
     return { id, version, updatedAt: resolved._updatedAt };
   }
 

@@ -5,6 +5,8 @@
  * Nunca persiste o token de API — apenas dados da aplicação.
  */
 
+import { Logger } from './Logger.js';
+
 export interface CacheEntry<T = any> {
   data: T;
   version: string;
@@ -41,11 +43,16 @@ export class LocalCacheAdapter {
   async read<T = any>(key: string): Promise<CacheEntry<T> | null> {
     await this.#initPromise;
     const entry = await this.#get<CacheEntry<T>>(key);
-    if (!entry) return null;
+    if (!entry) {
+      Logger.debug('LocalCache', `Cache MISS [${key}]`);
+      return null;
+    }
     if (Date.now() - entry.cachedAt > this.#ttl) {
+      Logger.debug('LocalCache', `Cache EXPIRED [${key}]`);
       await this.invalidate(key);
       return null;
     }
+    Logger.debug('LocalCache', `Cache HIT [${key}]`, { version: entry.version });
     return entry;
   }
 
