@@ -522,10 +522,26 @@
               </div>
             </div>
             <div class="row">
+              <div class="field">
+                <label for="in-devicename">deviceName (opcional — nome deste aparelho)</label>
+                <input
+                  type="text"
+                  id="in-devicename"
+                  placeholder="ex: Meu Chrome / Celular"
+                />
+              </div>
+            </div>
+            <div class="row">
               <div class="field checkbox">
                 <input type="checkbox" id="in-autoconnect" checked />
                 <label for="in-autoconnect"
                   >autoConnect (reaproveita Gist do prefixo automaticamente se gistId estiver em branco)</label
+                >
+              </div>
+              <div class="field checkbox">
+                <input type="checkbox" id="in-autosync" checked />
+                <label for="in-autosync"
+                  >autoSync (sincroniza automaticamente ao alternar abas / focar janela)</label
                 >
               </div>
               <div class="field checkbox">
@@ -587,6 +603,19 @@
                 delete(collection, id)
               </button>
               <button id="btn-list">list(collection)</button>
+            </div>
+          </div>
+
+          <!-- DEVICES -->
+          <div class="panel locked" id="panelDevices">
+            <h2>
+              03.5 · Dispositivos <span class="n">db.deviceId · db.devices.list()</span>
+            </h2>
+            <p class="desc">
+              Identifica este dispositivo e permite listar todos os aparelhos que já sincronizaram com este Gist.
+            </p>
+            <div class="actions">
+              <button class="primary" id="btn-list-devices">db.devices.list()</button>
             </div>
           </div>
 
@@ -739,6 +768,16 @@
           desc: 'Cancela assinatura e limpa o timer.',
         },
         {
+          id: 'devices',
+          method: 'db.devices.list()',
+          desc: 'Lista aparelhos que sincronizaram com este Gist.',
+        },
+        {
+          id: 'autoSync',
+          method: 'autoSync',
+          desc: 'Sincronização reativa orientada ao ciclo de vida da janela.',
+        },
+        {
           id: 'destroy',
           method: 'db.destroy()',
           desc: 'Limpa timers, observadores e o KeyVault.',
@@ -835,13 +874,13 @@
         btn.disabled = loading;
       }
       function unlockPanels() {
-        ['panelCrud', 'panelSync', 'panelWatch', 'panelDestroy'].forEach((id) =>
-          document.getElementById(id).classList.remove('locked'),
+        ['panelCrud', 'panelDevices', 'panelSync', 'panelWatch', 'panelDestroy'].forEach((id) =>
+          document.getElementById(id)?.classList.remove('locked'),
         );
       }
       function lockPanels() {
-        ['panelCrud', 'panelSync', 'panelWatch', 'panelDestroy'].forEach((id) =>
-          document.getElementById(id).classList.add('locked'),
+        ['panelCrud', 'panelDevices', 'panelSync', 'panelWatch', 'panelDestroy'].forEach((id) =>
+          document.getElementById(id)?.classList.add('locked'),
         );
       }
 
@@ -852,13 +891,15 @@
         const prefix = document.getElementById('in-prefix').value.trim();
         const gistId = document.getElementById('in-gistid').value.trim();
         const password = document.getElementById('in-password').value;
+        const deviceName = document.getElementById('in-devicename').value.trim() || undefined;
         const resolverChoice = document.getElementById('in-resolver').value;
         const ttl =
           Number(document.getElementById('in-ttl').value) || undefined;
         const autoConnect = document.getElementById('in-autoconnect').checked;
+        const autoSync = document.getElementById('in-autosync').checked;
         const useSchema = document.getElementById('in-schema').checked;
 
-        const cfg = { token, prefix, autoConnect };
+        const cfg = { token, prefix, autoConnect, autoSync, deviceName };
         if (gistId) cfg.gistId = gistId;
         if (password) cfg.password = password;
         if (ttl) cfg.ttl = ttl;
@@ -995,6 +1036,26 @@
             logEvent('ok', 'db.delete()', `${collection}/${id} removido`);
           } catch (err) {
             logEvent('err', 'db.delete()', describeError(err));
+          } finally {
+            setLoading(e.target, false);
+          }
+        });
+
+      /* ---------- 02.5 · Dispositivos ---------- */
+      document
+        .getElementById('btn-list-devices')
+        .addEventListener('click', async (e) => {
+          setLoading(e.target, true);
+          try {
+            const list = await db.devices.list();
+            markCovered('devices');
+            logEvent(
+              'ok',
+              'db.devices.list()',
+              `Dispositivo atual (${db.deviceId}): ${safeStringify(list)}`,
+            );
+          } catch (err) {
+            logEvent('err', 'db.devices.list()', describeError(err));
           } finally {
             setLoading(e.target, false);
           }
