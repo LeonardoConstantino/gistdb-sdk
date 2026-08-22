@@ -339,6 +339,7 @@ export class GistDB {
     if (cfg.onFocus && typeof document !== 'undefined') {
       const handleVisibility = () => {
         if (document.visibilityState === 'visible') {
+          Logger.info('GistDB', 'autoSync: ganho de foco da janela detectado, disparando sync()');
           this.sync().catch(() => {});
         }
       };

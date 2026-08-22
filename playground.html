@@ -936,6 +936,10 @@
 
         setLoading(btnInit, true);
         try {
+          if (autoSync) {
+            markCovered('autoSync');
+          }
+          Logger.enable('info');
           db = await GistDB.create(cfg);
           markCovered('create');
           logEvent(
