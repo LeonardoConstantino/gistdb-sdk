@@ -39,6 +39,7 @@ export class GistDB {
     schema = {},
     conflictResolver = 'last-write-wins',
     ttl = 5 * 60 * 1000,
+    autoConnect = true,
   }: {
     token: string;
     prefix: string;
@@ -50,6 +51,7 @@ export class GistDB {
       | 'merge'
       | ((local: any, remote: any) => any);
     ttl?: number;
+    autoConnect?: boolean;
   }): Promise<GistDB> {
     if (!token)
       throw new GistDBError('TOKEN_REQUIRED', 'Forneça um GitHub token.');
@@ -74,7 +76,7 @@ export class GistDB {
     db.#schema = schema;
 
     if (!gistId) {
-      db.#gistId = await db.#transport.initGist();
+      db.#gistId = await db.#transport.initGist(autoConnect);
     }
 
     db.#transport.setGistId(db.#gistId!);

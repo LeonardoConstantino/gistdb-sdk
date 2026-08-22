@@ -111,4 +111,24 @@ describe('GistTransport', () => {
     expect(tentativas).toBe(1);
     expect(api.calls.updateGist.length).toBe(1);
   });
+
+  test('initGist(true): reaproveita gist existente se encontrado (autoConnect)', async () => {
+    const api = makeMockApi();
+    const transport = new GistTransport(api, { retries: 2, timeout: 5000 });
+    const id = await transport.initGist(true);
+    expect(id).toBe('gist-123');
+  });
+
+  test('initGist(false): ignora gists existentes e cria um novo', async () => {
+    let criouGist = false;
+    const api = makeMockApi();
+    api.createGist = async () => {
+      criouGist = true;
+      return 'gist-novo-456';
+    };
+    const transport = new GistTransport(api, { retries: 2, timeout: 5000 });
+    const id = await transport.initGist(false);
+    expect(criouGist).toBe(true);
+    expect(id).toBe('gist-novo-456');
+  });
 });

@@ -523,6 +523,12 @@
             </div>
             <div class="row">
               <div class="field checkbox">
+                <input type="checkbox" id="in-autoconnect" checked />
+                <label for="in-autoconnect"
+                  >autoConnect (reaproveita Gist do prefixo automaticamente se gistId estiver em branco)</label
+                >
+              </div>
+              <div class="field checkbox">
                 <input type="checkbox" id="in-schema" />
                 <label for="in-schema"
                   >ativar schema para a collection "users" (exige campo "email"
@@ -849,9 +855,10 @@
         const resolverChoice = document.getElementById('in-resolver').value;
         const ttl =
           Number(document.getElementById('in-ttl').value) || undefined;
+        const autoConnect = document.getElementById('in-autoconnect').checked;
         const useSchema = document.getElementById('in-schema').checked;
 
-        const cfg = { token, prefix };
+        const cfg = { token, prefix, autoConnect };
         if (gistId) cfg.gistId = gistId;
         if (password) cfg.password = password;
         if (ttl) cfg.ttl = ttl;

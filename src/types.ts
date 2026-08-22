@@ -17,7 +17,8 @@ export interface GistDBConfig {
   /** Callback opcional de logs */
   logger?: (msg: string) => void;
   /** Estratégia de resolução de conflitos */
-  conflictResolver?: 'last-write-wins' | 'merge' | ((local: any, remote: any) => any);
+  /** Descoberta automática de Gist pelo prefixo se gistId omitido (padrão: true) */
+  autoConnect?: boolean;
 }
 
 export interface CacheEntry<T = any> {

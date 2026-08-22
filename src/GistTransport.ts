@@ -50,9 +50,11 @@ export class GistTransport {
     this.#gistId = id;
   }
 
-  async initGist(): Promise<string> {
-    const existing = await this.#retry<any[]>(() => this.#api.listGists());
-    if (existing.length > 0) return existing[0].id;
+  async initGist(autoConnect = true): Promise<string> {
+    if (autoConnect) {
+      const existing = await this.#retry<any[]>(() => this.#api.listGists());
+      if (existing.length > 0) return existing[0].id;
+    }
     // GitHub rejects creating a gist with an empty `files` object (422).
     // Create the gist with a small placeholder file so the API accepts it.
     const placeholderName = `.gistdb_meta_${Date.now()}.json`;
