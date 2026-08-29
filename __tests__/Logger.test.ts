@@ -55,4 +55,18 @@ describe('Logger (Observabilidade)', () => {
     const traceId = Logger.createTraceId();
     expect(traceId.startsWith('tr_')).toBe(true);
   });
+
+  test('subscribers recebem registros mesmo quando Logger.enable() não foi chamado', () => {
+    const logs: LogRecord[] = [];
+    Logger.subscribe((rec) => logs.push(rec));
+    // garante que o logger esteja desativado para o console
+    Logger.disable();
+
+    Logger.info('SilentModule', 'Log sem console output', { ok: true });
+    Logger.debug('SilentModule', 'Debug silencioso');
+
+    expect(logs.length).toBe(2);
+    expect(logs[0].message).toBe('Log sem console output');
+    expect(logs[1].message).toBe('Debug silencioso');
+  });
 });

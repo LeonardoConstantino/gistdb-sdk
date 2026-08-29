@@ -858,11 +858,17 @@
       const nativeInfo = console.info.bind(console);
       console.warn = (...args) => {
         nativeWarn(...args);
-        logEvent('warn', '[console.warn]', args.map(safeStringify).join(' '));
+        const str = args.map(safeStringify).join(' ');
+        if (!str.includes('"module":')) {
+          logEvent('warn', '[console.warn]', str);
+        }
       };
       console.info = (...args) => {
         nativeInfo(...args);
-        logEvent('info', '[console.info]', args.map(safeStringify).join(' '));
+        const str = args.map(safeStringify).join(' ');
+        if (!str.includes('"module":')) {
+          logEvent('info', '[console.info]', str);
+        }
       };
 
       // Assina diretamente os logs e telemetria emitidos pelo SDK

@@ -94,7 +94,8 @@ class LoggerClass {
   }
 
   private shouldLog(lvl: LogLevel) {
-    if (!this.enabled && this.handlers.size === 0) return false;
+    if (this.handlers.size > 0) return true;
+    if (!this.enabled) return false;
     return LEVELS[lvl] <= LEVELS[this.level];
   }
 
@@ -105,15 +106,15 @@ class LoggerClass {
       meta: record.meta !== undefined ? sanitize(record.meta) : undefined,
     };
 
-    // Notifica os handlers customizados
+    // Notifica os handlers customizados (subscribers)
     this.handlers.forEach((h) => {
       try {
         h(sanitizedRecord);
       } catch {}
     });
 
-    // Output para console apenas se habilitado ativamente
-    if (this.enabled) {
+    // Output para console apenas se habilitado ativamente e dentro do nível configurado
+    if (this.enabled && LEVELS[record.level] <= LEVELS[this.level]) {
       const json = JSON.stringify(sanitizedRecord);
       switch (record.level) {
         case 'error':
