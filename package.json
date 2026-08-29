@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "description": "GitHub Gist como backend leve para pequenos projetos browser",
   "type": "module",
-  "main": "./src/GistDB.js",
+  "main": "./dist/gistdb.min.js",
+  "types": "./dist/GistDB.d.ts",
   "exports": {
-    ".": "./src/GistDB.js",
+    ".": {
+      "import": "./dist/gistdb.min.js",
+      "types": "./dist/GistDB.d.ts"
+    },
     "./crypto": "./src/CryptoManager.js",
     "./errors": "./src/errors.js"
   },
   "files": [
+    "dist/",
     "src/"
   ],
   "scripts": {

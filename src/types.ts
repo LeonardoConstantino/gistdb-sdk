@@ -2,24 +2,27 @@
  * types.ts — Contratos e definições de tipos para o GistDB SDK.
  */
 
-
 export interface GistDBConfig {
-  /** GitHub Personal Access Token */
+  /** GitHub Personal Access Token (obrigatório) */
   token: string;
-  /** Prefixo opcional para isolar chaves no Gist */
-  prefix?: string;
+  /** Prefixo para isolar chaves no Gist (obrigatório) */
+  prefix: string;
   /** ID opcional do Gist se já existente */
-  gistId?: string;
-  /** Criptografia ativada (padrão: false) */
-  encryption?: boolean;
-  /** Senha para criptografia AES-GCM (obrigatório se encryption for true) */
+  gistId?: string | null;
+  /** Senha para criptografia AES-GCM (opcional) */
   password?: string;
-  /** Callback opcional de logs */
-  logger?: (msg: string) => void;
+  /** Esquema de validação por collection */
+  schema?: Record<string, (data: any) => boolean>;
   /** Estratégia de resolução de conflitos */
-  /** Descoberta automática de Gist pelo prefixo se gistId omitido (padrão: true) */
+  conflictResolver?:
+    | 'last-write-wins'
+    | 'merge'
+    | ((local: any, remote: any) => any);
+  /** TTL do cache local em milissegundos */
+  ttl?: number;
+  /** Descoberta automática de Gist pelo prefixo se gistId for omitido (padrão: true) */
   autoConnect?: boolean;
-  /** Sincronização automática orientada a eventos do ciclo de vida (onFocus, onReconnect, onUnload) */
+  /** Sincronização automática orientada a eventos do ciclo de vida da janela */
   autoSync?:
     | boolean
     | {
@@ -40,9 +43,9 @@ export interface DeviceInfo {
 }
 
 export interface CacheEntry<T = any> {
-  value: T;
+  data: T;
   version: string;
-  timestamp: number;
+  cachedAt: number;
 }
 
 export interface TransportPayload {
@@ -53,7 +56,10 @@ export interface TransportPayload {
   action: 'set' | 'delete';
 }
 
-export interface CryptoPayload {
-  cipher: string;
+export interface EncryptedPayload {
+  __encrypted: true;
   iv: string;
+  ciphertext: string;
+  salt: string;
 }
+

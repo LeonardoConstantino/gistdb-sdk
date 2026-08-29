@@ -1,1 +1,1 @@
-console.log('Hello, Node.js World! For gistdb-sdk');
+export { GistDB, Logger } from './dist/gistdb.min.js';

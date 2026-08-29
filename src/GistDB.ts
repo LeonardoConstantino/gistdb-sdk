@@ -10,7 +10,7 @@ import { ConflictResolver } from './ConflictResolver.js';
 import { KeyVault } from './KeyVault.js';
 import { GistDBError } from './errors.js';
 import { DeviceIdentity } from './DeviceIdentity.js';
-import { DeviceInfo } from './types.js';
+import { DeviceInfo, GistDBConfig } from './types.js';
 import { Logger } from './Logger.js';
 
 
@@ -66,27 +66,7 @@ export class GistDB {
     autoConnect = true,
     autoSync = false,
     deviceName = undefined,
-  }: {
-    token: string;
-    prefix: string;
-    gistId?: string | null;
-    password?: string;
-    schema?: Record<string, (data: any) => boolean>;
-    conflictResolver?:
-      | 'last-write-wins'
-      | 'merge'
-      | ((local: any, remote: any) => any);
-    ttl?: number;
-    autoConnect?: boolean;
-    autoSync?:
-      | boolean
-      | {
-          onFocus?: boolean;
-          onReconnect?: boolean;
-          onUnload?: boolean;
-        };
-    deviceName?: string;
-  }): Promise<GistDB> {
+  }: GistDBConfig): Promise<GistDB> {
     if (!token)
       throw new GistDBError('TOKEN_REQUIRED', 'Forneça um GitHub token.');
     if (!prefix)
@@ -422,13 +402,13 @@ export class GistDB {
               'payload verification failed after restore, returning raw payload',
             );
             return data;
-          } catch (err3) {
+          } catch (err3: any) {
             Logger.warn('GistDB', 'decrypt still failing after restore', {
               err: err3?.message || String(err3),
             });
             return data;
           }
-        } catch (err2) {
+        } catch (err2: any) {
           Logger.warn(
             'GistDB',
             'restore via salt failed, returning raw payload',

@@ -1,12 +1,12 @@
-import { GistDB } from './src/GistDB.js';
+import { GistDB } from './index.js';
 
 // ─── 1. Inicialização ─────────────────────────────────────────
 const db = await GistDB.create({
   token: 'ghp_SEU_TOKEN_AQUI',
   prefix: 'meuapp',
-  encryptionKey: 'senha-forte-do-usuario',
-  conflict: 'last-write-wins',
-  cacheTTL: 10 * 60 * 1000,
+  password: 'senha-forte-do-usuario',
+  conflictResolver: 'last-write-wins',
+  ttl: 10 * 60 * 1000,
 
   // Validação opcional por collection
   schema: {
@@ -62,7 +62,7 @@ db.destroy();
 const publicDb = await GistDB.create({
   token: 'ghp_SEU_TOKEN_AQUI',
   prefix: 'config-publica',
-  // sem encryptionKey → dados em plaintext no Gist
+  // sem password → dados em plaintext no Gist
 });
 
 await publicDb.set('settings', 'theme', { mode: 'dark', lang: 'pt-BR' });
