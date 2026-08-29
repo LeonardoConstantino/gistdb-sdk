@@ -1,18 +1,19 @@
-# Master Plan: GistDB SDK — Multi-Device Sync & DX Enhancements (v1.1)
+# Master Plan: GistDB SDK — Multi-Device Sync, DX & Refactoring (v1.2)
 
-Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK** para melhorar drasticamente a experiência do desenvolvedor (DX) e a sincronização transparente entre múltiplos dispositivos.
+Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK** para melhorar a experiência do desenvolvedor (DX), a sincronização transparente entre múltiplos dispositivos e o saneamento técnico decorrente das auditorias de código (Code Review v2).
 
 ## Status do Projeto
-- **Fase Atual:** Fase 1 — Identidade e Descoberta Automática de Dispositivos
+- **Fase Atual:** Fase 4 — Correções e Refatoração de Qualidade (Code Review v2)
 - **Stack:** TypeScript, Web Crypto API (AES-GCM), GitHub Gist REST API, IndexedDB/Storage API
-- **Progresso Geral:** 0%
+- **Progresso Geral:** Tasks 01, 02 e 03 Concluídas ([X])
 
 ## Diretrizes para Agentes
-1. **Leia a Task:** Abra o arquivo correspondente na pasta `tasks/`.
-2. **Siga os padrões:** Manter TypeScript estrito, métodos assíncronos e erros herdando de `GistDBError`.
-3. **Preserve Contratos Públicos:** Não quebre a API legada `GistDB.create({ token, prefix, gistId })`. Torne as novas opções (`autoConnect`, `autoSync`, etc.) opcionais e retrocompatíveis.
-4. **Testes:** Nenhuma task é concluída sem testes unitários em `__tests__/`.
-5. **Reporte:** Ao finalizar, atualize o status abaixo para `[X]`.
+1. **Isolamento de Branches:** Cada task deve ser implementada em sua própria branch (ex: `feature/task-07-transport-timeout`).
+2. **Leia a Task:** Abra o arquivo correspondente na pasta `tasks/`.
+3. **Siga os Padrões:** Manter TypeScript estrito, métodos assíncronos e erros herdando de `GistDBError`.
+4. **Preserve Contratos Públicos:** Não quebre a API pública `GistDB.create({ token, prefix, ... })`.
+5. **Testes Obrigatórios:** Nenhuma task é dada como concluída até que todos os testes (`npm test`) estejam passando.
+6. **Reporte:** Ao finalizar e mesclar a branch na `master`, atualize o status abaixo para `[X]`.
 
 ---
 
@@ -36,8 +37,18 @@ Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK*
 | **05** | [API de Hand-off de Sessão (`db.session`)](./tasks/05_session_handoff.md) | [ ] | 02 |
 | **06** | [Smart ETag Polling (`If-None-Match` no `watch`)](./tasks/06_smart_etag_watch.md) | [ ] | 01 |
 
+### Fase 4: Correções e Refatoração de Qualidade (Code Review v2)
+| ID | Task | Status | Dependências |
+|----|------|--------|--------------|
+| **07** | [Correção do Timeout em `GistTransport` via `AbortController`](./tasks/07_fix_transport_timeout.md) | [ ] | — |
+| **08** | [Sincronização de Contratos (`types.ts`, `package.json`, `usage-example.js`)](./tasks/08_fix_types_and_examples.md) | [ ] | — |
+| **09** | [Subscribers do `Logger` e Desduplicação no Playground](./tasks/09_fix_logger_subscribers.md) | [ ] | — |
+| **10** | [Persistência de `lastSyncAt` e Pipeline de Decifragem em `GistDB.ts`](./tasks/10_refactor_decryption_pipeline_and_lastsync.md) | [ ] | — |
+| **11** | [Testes Unitários da Classe Real `GistDB` e Limpeza de Código Morto](./tasks/11_real_gistdb_unit_tests.md) | [ ] | 07, 10 |
+
 ---
 
 ## Notas de Orquestração
-- **TypeScript:** Todas as exportações públicas devem estar tipadas em `src/types.ts`.
-- **Compatibilidade Node/Browser:** Manter suporte isomórfico (Web APIs com fallbacks apropriados).
+- **Branches por Task:** Sempre criar uma nova branch `feature/task-XX-...` antes de iniciar cada tarefa.
+- **Validação com Testes:** A tarefa só é finalizada quando `npm test` executar com 100% de sucesso.
+- **TypeScript:** Todas as exportações públicas devem estar devidamente tipadas em `src/types.ts`.
