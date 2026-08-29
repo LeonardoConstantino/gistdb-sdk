@@ -16,42 +16,69 @@ export class GistAPI {
     this.#prefix = prefix;
   }
 
-  async createGist(files: Record<string, any> = {}, isPublic = false): Promise<string> {
-    const res = await this.#req('POST', '/gists', {
-      description: `gistdb:${this.#prefix}`,
-      public: isPublic,
-      files,
-    });
+  async createGist(
+    files: Record<string, any> = {},
+    isPublic = false,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const res = await this.#req(
+      'POST',
+      '/gists',
+      {
+        description: `gistdb:${this.#prefix}`,
+        public: isPublic,
+        files,
+      },
+      signal,
+    );
     return res.id;
   }
 
-  async getGist(gistId: string): Promise<any> {
-    return this.#req('GET', `/gists/${gistId}`);
+  async getGist(gistId: string, signal?: AbortSignal): Promise<any> {
+    return this.#req('GET', `/gists/${gistId}`, null, signal);
   }
 
-  async updateGist(gistId: string, files: Record<string, any>): Promise<any> {
-    return this.#req('PATCH', `/gists/${gistId}`, { files });
+  async updateGist(
+    gistId: string,
+    files: Record<string, any>,
+    signal?: AbortSignal,
+  ): Promise<any> {
+    return this.#req('PATCH', `/gists/${gistId}`, { files }, signal);
   }
 
-  async deleteFile(gistId: string, filename: string): Promise<boolean> {
-    await this.#req('PATCH', `/gists/${gistId}`, {
-      files: { [filename]: null },
-    });
+  async deleteFile(
+    gistId: string,
+    filename: string,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
+    await this.#req(
+      'PATCH',
+      `/gists/${gistId}`,
+      {
+        files: { [filename]: null },
+      },
+      signal,
+    );
     return true;
   }
 
   /**
    * Lista gists do usuário filtrados pelo prefixo.
    */
-  async listGists(): Promise<any[]> {
-    const all = await this.#req('GET', '/gists?per_page=100');
+  async listGists(signal?: AbortSignal): Promise<any[]> {
+    const all = await this.#req('GET', '/gists?per_page=100', null, signal);
     if (!Array.isArray(all)) return [];
     return all.filter((g: any) => g.description === `gistdb:${this.#prefix}`);
   }
 
   // ─── HTTP INTERNO ────────────────────────────────────────────
 
-  async #req(method: string, path: string, body: any = null): Promise<any> {
+  async #req(
+    method: string,
+    path: string,
+    body: any = null,
+    signal?: AbortSignal,
+  ): Promise<any> {
     const token = this.#getToken();
     if (!token) throw new GistDBError('NO_TOKEN', 'Token não disponível.');
 
@@ -63,6 +90,7 @@ export class GistAPI {
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json',
       },
+      signal,
     };
 
     if (body !== null) opts.body = JSON.stringify(body);

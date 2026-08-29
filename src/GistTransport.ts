@@ -52,7 +52,9 @@ export class GistTransport {
 
   async initGist(autoConnect = true): Promise<string> {
     if (autoConnect) {
-      const existing = await this.#retry<any[]>(() => this.#api.listGists());
+      const existing = await this.#retry<any[]>((signal) =>
+        this.#api.listGists(signal),
+      );
       if (existing.length > 0) return existing[0].id;
     }
     // Cria o Gist inicial já incluindo o manifesto estático do banco de dados (evita erro 422 do GitHub)
@@ -66,11 +68,15 @@ export class GistTransport {
         content: JSON.stringify(manifestContent, null, 2),
       },
     };
-    return this.#retry<any>(() => this.#api.createGist(placeholder, false));
+    return this.#retry<any>((signal) =>
+      this.#api.createGist(placeholder, false, signal),
+    );
   }
 
   async getFile(filename: string): Promise<any> {
-    const gist = await this.#retry<any>(() => this.#api.getGist(this.#gistId));
+    const gist = await this.#retry<any>((signal) =>
+      this.#api.getGist(this.#gistId, signal),
+    );
     if (!gist?.files?.[filename]) return null;
     const raw = gist.files[filename].content;
     try {
@@ -82,8 +88,12 @@ export class GistTransport {
 
   async putFile(filename: string, data: any): Promise<void> {
     const content = JSON.stringify(data, null, 2);
-    const op = () =>
-      this.#api.updateGist(this.#gistId, { [filename]: { content } });
+    const op = (signal?: AbortSignal) =>
+      this.#api.updateGist(
+        this.#gistId,
+        { [filename]: { content } },
+        signal,
+      );
 
     // Fallback seguro se navigator não estiver definido (ex: Node/SSR)
     const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
@@ -102,11 +112,15 @@ export class GistTransport {
       await this.#enqueueOffline({ type: 'DELETE', filename });
       return;
     }
-    await this.#retry(() => this.#api.deleteFile(this.#gistId, filename));
+    await this.#retry((signal) =>
+      this.#api.deleteFile(this.#gistId, filename, signal),
+    );
   }
 
   async listFiles(collection: string): Promise<any[]> {
-    const gist = await this.#retry<any>(() => this.#api.getGist(this.#gistId));
+    const gist = await this.#retry<any>((signal) =>
+      this.#api.getGist(this.#gistId, signal),
+    );
     if (!gist?.files) return [];
 
     return Object.entries(gist.files)
@@ -128,14 +142,18 @@ export class GistTransport {
     for (const op of queue) {
       try {
         if (op.type === 'PUT') {
-          await this.#retry(() =>
-            this.#api.updateGist(this.#gistId, {
-              [op.filename]: { content: op.content! },
-            }),
+          await this.#retry((signal) =>
+            this.#api.updateGist(
+              this.#gistId,
+              {
+                [op.filename]: { content: op.content! },
+              },
+              signal,
+            ),
           );
         } else if (op.type === 'DELETE') {
-          await this.#retry(() =>
-            this.#api.deleteFile(this.#gistId, op.filename),
+          await this.#retry((signal) =>
+            this.#api.deleteFile(this.#gistId, op.filename, signal),
           );
         }
       } catch {
@@ -149,12 +167,15 @@ export class GistTransport {
 
   // ─── RETRY ───────────────────────────────────────────────────
 
-  async #retry<T>(fn: () => Promise<T>, attempt = 0): Promise<T> {
+  async #retry<T>(
+    fn: (signal?: AbortSignal) => Promise<T>,
+    attempt = 0,
+  ): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#timeout);
 
     try {
-      const result = await fn();
+      const result = await fn(controller.signal);
       clearTimeout(timer);
       return result;
     } catch (err) {

@@ -131,4 +131,41 @@ describe('GistTransport', () => {
     expect(criouGist).toBe(true);
     expect(id).toBe('gist-novo-456');
   });
+
+  test('timeout: repassa AbortSignal para as chamadas de API', async () => {
+    let signalRecebido: AbortSignal | undefined;
+    const api = makeMockApi();
+    api.getGist = async (_id: string, signal?: AbortSignal) => {
+      signalRecebido = signal;
+      return { id: _id, files: {} };
+    };
+
+    const transport = new GistTransport(api, { retries: 0, timeout: 1000 });
+    transport.setGistId('gist-123');
+    await transport.getFile('test.json');
+
+    expect(signalRecebido).toBeDefined();
+    expect(signalRecebido instanceof AbortSignal).toBe(true);
+  });
+
+  test('timeout: cancela a requisição quando estoura o limite de tempo', async () => {
+    let foiAbortado = false;
+    const api = makeMockApi();
+    api.getGist = async (_id: string, signal?: AbortSignal) => {
+      return new Promise((_, reject) => {
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            foiAbortado = true;
+            reject(new Error('aborted'));
+          });
+        }
+      });
+    };
+
+    const transport = new GistTransport(api, { retries: 0, timeout: 50 });
+    transport.setGistId('gist-123');
+
+    await expect(transport.getFile('test.json')).rejects.toThrow();
+    expect(foiAbortado).toBe(true);
+  });
 });
