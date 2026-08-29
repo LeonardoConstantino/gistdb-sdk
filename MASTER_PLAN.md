@@ -43,7 +43,7 @@ Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK*
 | **07** | [Correção do Timeout em `GistTransport` via `AbortController`](./tasks/07_fix_transport_timeout.md) | [X] | — |
 | **08** | [Sincronização de Contratos (`types.ts`, `package.json`, `usage-example.js`)](./tasks/08_fix_types_and_examples.md) | [X] | — |
 | **09** | [Subscribers do `Logger` e Desduplicação no Playground](./tasks/09_fix_logger_subscribers.md) | [X] | — |
-| **10** | [Persistência de `lastSyncAt` e Pipeline de Decifragem em `GistDB.ts`](./tasks/10_refactor_decryption_pipeline_and_lastsync.md) | [ ] | — |
+| **10** | [Persistência de `lastSyncAt` e Pipeline de Decifragem em `GistDB.ts`](./tasks/10_refactor_decryption_pipeline_and_lastsync.md) | [X] | — |
 | **11** | [Testes Unitários da Classe Real `GistDB` e Limpeza de Código Morto](./tasks/11_real_gistdb_unit_tests.md) | [ ] | 07, 10 |
 
 ---
