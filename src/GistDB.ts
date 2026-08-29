@@ -236,11 +236,13 @@ export class GistDB {
     this.#assertReady();
     await this.#cache!.clear();
     await this.#transport!.flushQueue();
-    return { syncedAt: new Date().toISOString() };
+    const syncedAt = new Date().toISOString();
+    await this.#cache!.write('__meta__', { lastSyncAt: syncedAt }, 'v1');
+    return { syncedAt };
   }
 
   async getLastSyncAt(): Promise<string | null> {
-    const meta = await this.#cache!.read(`${this.#prefix}:__meta__`);
+    const meta = await this.#cache!.read('__meta__');
     return meta?.data?.lastSyncAt ?? null;
   }
 
@@ -372,55 +374,56 @@ export class GistDB {
 
   async #maybeDecrypt(data: any): Promise<any> {
     if (!this.#crypto) return data;
-    try {
-      return await this.#crypto.decrypt(data);
-    } catch (err) {
-      // Se a descriptografia falhar, emitimos logs estruturados para
-      // investigação e tentamos re-derivar a chave a partir do `salt`.
-      Logger.warn('GistDB', 'decrypt failed, attempting restore via salt', {
-        hasSalt: !!data?.salt,
-        passwordPresent: !!this.#password,
-        // include payload analysis to aid diagnosis
-        payload: CryptoManager.analyzePayload(data),
-      });
-      if (data?.salt && this.#password) {
-        try {
-          const restored = await CryptoManager.restore(
-            this.#password,
-            data.salt,
-          );
-          this.#crypto = restored;
-          // Verifica integridade antes de tentar descriptografar
-          try {
-            const verified = await restored.verify(data).catch(() => false);
-            Logger.info('GistDB', 'verify after restore', { verified });
-            if (verified) {
-              return await this.#crypto.decrypt(data);
-            }
-            Logger.warn(
-              'GistDB',
-              'payload verification failed after restore, returning raw payload',
-            );
-            return data;
-          } catch (err3: any) {
-            Logger.warn('GistDB', 'decrypt still failing after restore', {
-              err: err3?.message || String(err3),
-            });
-            return data;
-          }
-        } catch (err2: any) {
-          Logger.warn(
-            'GistDB',
-            'restore via salt failed, returning raw payload',
-            {
-              err: err2?.message || String(err2),
-            },
-          );
-          return data;
-        }
-      }
-      return data;
+
+    // 1. Tentar decifragem direta
+    const primaryResult = await this.#tryDecrypt(data);
+    if (primaryResult.success) return primaryResult.data;
+
+    // 2. Se falhar e houver salt + password, tentar restauração da chave
+    Logger.warn('GistDB', 'decrypt failed, attempting restore via salt', {
+      hasSalt: !!data?.salt,
+      passwordPresent: !!this.#password,
+      payload: CryptoManager.analyzePayload(data),
+    });
+
+    if (data?.salt && this.#password) {
+      const restoredData = await this.#tryRestoreAndVerify(data);
+      if (restoredData !== null) return restoredData;
     }
+
+    return data;
+  }
+
+  async #tryDecrypt(data: any): Promise<{ success: boolean; data?: any }> {
+    try {
+      const decrypted = await this.#crypto.decrypt(data);
+      return { success: true, data: decrypted };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async #tryRestoreAndVerify(data: any): Promise<any | null> {
+    try {
+      const restored = await CryptoManager.restore(this.#password!, data.salt);
+      this.#crypto = restored;
+
+      const verified = await restored.verify(data).catch(() => false);
+      Logger.info('GistDB', 'verify after restore', { verified });
+
+      if (verified) {
+        return await restored.decrypt(data);
+      }
+      Logger.warn(
+        'GistDB',
+        'payload verification failed after restore, returning raw payload',
+      );
+    } catch (err: any) {
+      Logger.warn('GistDB', 'restore via salt failed, returning raw payload', {
+        err: err?.message || String(err),
+      });
+    }
+    return null;
   }
 
   #validate(collection: string, data: any): void {

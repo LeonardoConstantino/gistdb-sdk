@@ -110,6 +110,19 @@ async function makeTestDB(opts: { encryptionKey?: string; schema?: Record<string
       return filterFn ? files.filter(filterFn) : files;
     },
 
+    async sync() {
+      await cache.clear();
+      await transport.flushQueue();
+      const syncedAt = new Date().toISOString();
+      await cache.write('__meta__', { lastSyncAt: syncedAt }, 'v1');
+      return { syncedAt };
+    },
+
+    async getLastSyncAt() {
+      const meta = await cache.read('__meta__');
+      return meta?.data?.lastSyncAt ?? null;
+    },
+
     watch(collection: string, cb: (id: string, data: any) => void) {
       if (!watchers[collection]) watchers[collection] = new Set();
       watchers[collection].add(cb);
@@ -217,5 +230,13 @@ describe('GistDB (integração)', () => {
     const db = await makeTestDB();
     (db as any)['#setupAutoSync']?.({ onFocus: true, onReconnect: true });
     expect(() => db.destroy()).not.toThrow();
+  });
+
+  test('sync() grava a data de sincronização e getLastSyncAt() retorna a data ISO', async () => {
+    const db = await makeTestDB();
+    expect(await db.getLastSyncAt()).toBeNull();
+    const { syncedAt } = await db.sync();
+    expect(typeof syncedAt).toBe('string');
+    expect(await db.getLastSyncAt()).toBe(syncedAt);
   });
 });
