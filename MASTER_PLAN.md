@@ -40,7 +40,7 @@ Este arquivo coordena o plano de implementação e a evolução do **GistDB SDK*
 ### Fase 4: Correções e Refatoração de Qualidade (Code Review v2)
 | ID | Task | Status | Dependências |
 |----|------|--------|--------------|
-| **07** | [Correção do Timeout em `GistTransport` via `AbortController`](./tasks/07_fix_transport_timeout.md) | [ ] | — |
+| **07** | [Correção do Timeout em `GistTransport` via `AbortController`](./tasks/07_fix_transport_timeout.md) | [X] | — |
 | **08** | [Sincronização de Contratos (`types.ts`, `package.json`, `usage-example.js`)](./tasks/08_fix_types_and_examples.md) | [ ] | — |
 | **09** | [Subscribers do `Logger` e Desduplicação no Playground](./tasks/09_fix_logger_subscribers.md) | [ ] | — |
 | **10** | [Persistência de `lastSyncAt` e Pipeline de Decifragem em `GistDB.ts`](./tasks/10_refactor_decryption_pipeline_and_lastsync.md) | [ ] | — |
