@@ -13,7 +13,8 @@ export type ErrorCode =
   | 'RATE_LIMITED'
   | 'API_ERROR'
   | 'NO_TOKEN'
-  | 'DECRYPT_FAILED';
+  | 'DECRYPT_FAILED'
+  | 'NOT_FOUND';
 
 export class GistDBError extends Error {
   public readonly code: ErrorCode;
@@ -35,4 +36,5 @@ export const ERROR_CODES: Record<ErrorCode, ErrorCode> = {
   API_ERROR: 'API_ERROR',
   NO_TOKEN: 'NO_TOKEN',
   DECRYPT_FAILED: 'DECRYPT_FAILED',
+  NOT_FOUND: 'NOT_FOUND',
 };

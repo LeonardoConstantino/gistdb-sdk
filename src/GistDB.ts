@@ -207,6 +207,67 @@ export class GistDB {
     return { id, version, updatedAt: resolved._updatedAt };
   }
 
+  async update(
+    collection: string,
+    id: string,
+    partialData: any,
+  ): Promise<{ id: string; version: string; updatedAt: string }> {
+    this.#assertReady();
+    const existing = await this.get(collection, id);
+    if (!existing) {
+      throw new GistDBError(
+        'NOT_FOUND',
+        `Registro não encontrado para update em ${collection}/${id}.`,
+      );
+    }
+    const merged = { ...existing, ...partialData };
+    return this.set(collection, id, merged);
+  }
+
+  async has(collection: string, id: string): Promise<boolean> {
+    this.#assertReady();
+    const cached = await this.#cache!.read(this.#key(collection, id));
+    if (cached) return true;
+
+    const remote = await this.#transport!.getFile(
+      this.#filename(collection, id),
+    );
+    return !!remote;
+  }
+
+  async clearCollection(collection: string): Promise<void> {
+    this.#assertReady();
+    const files = await this.#transport!.listFiles(collection);
+    for (const f of files) {
+      await this.#transport!.deleteFile(f.filename);
+      await this.#cache!.invalidate(this.#key(collection, f.data._id));
+      this.#notifyWatchers(collection, f.data._id, null);
+    }
+  }
+
+  async clearCache(): Promise<void> {
+    this.#assertReady();
+    await this.#cache!.clear();
+  }
+
+  async clearAll(): Promise<void> {
+    this.#assertReady();
+    await this.clearCache();
+    const collections = new Set<string>();
+    const files = await this.#transport!.listFiles('');
+    for (const f of files) {
+      const parts = f.filename.split('_');
+      if (parts.length >= 4) {
+        const collection = parts[2];
+        collections.add(collection);
+      }
+      await this.#transport!.deleteFile(f.filename);
+    }
+    for (const collection of collections) {
+      this.#notifyWatchers(collection, '', null);
+    }
+  }
+
   async delete(collection: string, id: string): Promise<boolean> {
     this.#assertReady();
     await this.#transport!.deleteFile(this.#filename(collection, id));
