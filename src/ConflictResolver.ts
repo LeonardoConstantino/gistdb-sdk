@@ -1,60 +1,74 @@
-/**
- * ConflictResolver — estratégias de merge para conflitos multi-dispositivo.
- */
+export type ConflictStrategy =
+  | 'last-write-wins'
+  | 'remote-wins'
+  | 'local-wins'
+  | 'merge'
+  | 'custom';
 
-export type ConflictStrategy = 'last-write-wins' | 'remote-wins' | 'local-wins' | 'merge' | 'custom';
+export type ConflictMeta = {
+  timestampKey?: string; // campo usado em last-write-wins (default: '_updatedAt')
+  [key: string]: unknown;
+};
 
-export class ConflictResolver {
+type Versioned = { [key: string]: unknown };
+type CustomFn<T> = (local: T, remote: T, meta: ConflictMeta) => T;
+
+const VALID_STRATEGIES: ConflictStrategy[] = [
+  'last-write-wins',
+  'remote-wins',
+  'local-wins',
+  'merge',
+  'custom',
+];
+
+export class ConflictResolver<T extends Versioned = Versioned> {
   #strategy: ConflictStrategy;
-  #customFn: ((local: any, remote: any, meta: any) => any) | null;
+  #customFn: CustomFn<T> | null;
 
-  constructor(
-    strategy: ConflictStrategy | ((local: any, remote: any, meta: any) => any) = 'last-write-wins'
-  ) {
+  constructor(strategy: ConflictStrategy | CustomFn<T> = 'last-write-wins') {
     if (typeof strategy === 'function') {
       this.#strategy = 'custom';
       this.#customFn = strategy;
-    } else {
-      const valid: ConflictStrategy[] = ['last-write-wins', 'remote-wins', 'local-wins', 'merge', 'custom'];
-      if (!valid.includes(strategy)) {
-        throw new Error(`ConflictResolver: estratégia inválida "${strategy}".`);
-      }
-      this.#strategy = strategy;
-      this.#customFn = null;
+      return;
     }
+
+    if (!VALID_STRATEGIES.includes(strategy)) {
+      throw new Error(`ConflictResolver: estratégia inválida "${strategy}".`);
+    }
+
+    this.#strategy = strategy;
+    this.#customFn = null;
   }
 
-  /**
-   * Resolve o conflito de dados.
-   */
-  resolve(local: any, remote: any, meta: any = {}): any {
-    if (!remote) return local;
+  resolve(local: T | null, remote: T | null, meta: ConflictMeta = {}): T {
+    if (!remote) return local!;
     if (!local) return remote;
 
     switch (this.#strategy) {
       case 'last-write-wins': {
-        const localTime = new Date(local._updatedAt ?? 0).getTime();
-        const remoteTime = new Date(remote._updatedAt ?? 0).getTime();
+        const key = meta.timestampKey ?? '_updatedAt';
+        const localTime = new Date((local[key] as string) ?? 0).getTime();
+        const remoteTime = new Date((remote[key] as string) ?? 0).getTime();
         return localTime >= remoteTime ? local : remote;
       }
 
       case 'remote-wins':
         return remote;
 
-      case 'merge':
-        return { ...remote, ...local };
-
       case 'local-wins':
         return local;
 
-      case 'custom':
-        if (this.#customFn) {
-          return this.#customFn(local, remote, meta);
-        }
-        return local;
+      case 'merge':
+        // remote como base, local sobrescreve — "local tem prioridade nos conflitos"
+        // inverta a ordem se quiser semântica oposta
+        return { ...remote, ...local };
 
-      default:
-        return local;
+      case 'custom':
+        return this.#customFn!(local, remote, meta);
     }
+  }
+
+  get strategy(): ConflictStrategy {
+    return this.#strategy;
   }
 }
