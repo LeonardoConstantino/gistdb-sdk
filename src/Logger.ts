@@ -23,7 +23,10 @@ const LEVELS: Record<LogLevel, number> = {
 function sanitize(obj: any): any {
   if (!obj || typeof obj !== 'object') {
     if (typeof obj === 'string') {
-      return obj.replace(/(ghp_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,}_[A-Za-z0-9_]{59})/g, '[REDACTED_TOKEN]');
+      return obj.replace(
+        /(ghp_[A-Za-z0-9_]{36,}|github_pat_[A-Za-z0-9_]{22,}_[A-Za-z0-9_]{59})/g,
+        '[REDACTED_TOKEN]',
+      );
     }
     return obj;
   }
@@ -35,13 +38,152 @@ function sanitize(obj: any): any {
   const clean: Record<string, any> = {};
   for (const [key, val] of Object.entries(obj)) {
     const lowerKey = key.toLowerCase();
-    if (lowerKey.includes('token') || lowerKey.includes('password') || lowerKey.includes('secret')) {
+    if (
+      lowerKey.includes('token') ||
+      lowerKey.includes('password') ||
+      lowerKey.includes('secret')
+    ) {
       clean[key] = '[REDACTED]';
     } else {
       clean[key] = sanitize(val);
     }
   }
   return clean;
+}
+
+// ─── Detecção de ambiente ───────────────────────────────────────────────────
+
+const isNode = typeof process !== 'undefined' && process.stdout != null;
+const isTTY = isNode && process.stdout?.isTTY;
+const isBrowser = typeof window !== 'undefined';
+
+// ─── Estilos ANSI (Node TTY) ────────────────────────────────────────────────
+
+const ANSI = {
+  reset: '\x1b[0m',
+  bold: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m',
+  white: '\x1b[97m',
+} as const;
+
+const LEVEL_ANSI: Record<LogLevel, { color: string; badge: string }> = {
+  none: { color: '', badge: '      ' },
+  error: { color: ANSI.red, badge: ' ERR  ' },
+  warn: { color: ANSI.yellow, badge: ' WARN ' },
+  info: { color: ANSI.cyan, badge: ' INFO ' },
+  debug: { color: ANSI.gray, badge: ' DBG  ' },
+};
+
+function colorize(color: string, text: string): string {
+  return isTTY ? `${color}${text}${ANSI.reset}` : text;
+}
+
+// ─── Estilos CSS (Navegador) ─────────────────────────────────────────────────
+
+const LEVEL_CSS: Record<
+  LogLevel,
+  { badge: string; badgeCSS: string; msgCSS: string }
+> = {
+  none: { badge: '      ', badgeCSS: '', msgCSS: '' },
+  error: {
+    badge: ' ERR  ',
+    badgeCSS:
+      'background:#e53e3e;color:#fff;font-weight:bold;border-radius:3px;padding:1px 4px',
+    msgCSS: 'color:#e53e3e;font-weight:bold',
+  },
+  warn: {
+    badge: ' WARN ',
+    badgeCSS:
+      'background:#d69e2e;color:#fff;font-weight:bold;border-radius:3px;padding:1px 4px',
+    msgCSS: 'color:#b7791f;font-weight:bold',
+  },
+  info: {
+    badge: ' INFO ',
+    badgeCSS:
+      'background:#3182ce;color:#fff;font-weight:bold;border-radius:3px;padding:1px 4px',
+    msgCSS: 'color:#2b6cb0',
+  },
+  debug: {
+    badge: ' DBG  ',
+    badgeCSS:
+      'background:#718096;color:#fff;font-weight:bold;border-radius:3px;padding:1px 4px',
+    msgCSS: 'color:#718096',
+  },
+};
+
+const CSS = {
+  dim: 'color:#a0aec0;font-size:0.85em',
+  mod: 'color:#888;font-weight:600',
+  meta: 'color:#718096;font-size:0.85em',
+} as const;
+
+// ─── Formatters ──────────────────────────────────────────────────────────────
+
+function formatNode(record: LogRecord): string {
+  const { color, badge } = LEVEL_ANSI[record.level];
+  const time = colorize(ANSI.dim, record.ts.slice(11, 23));
+  const lvl = colorize(ANSI.bold + color, badge);
+  const mod = colorize(ANSI.white, `[${record.module}]`);
+  const msg = colorize(color, record.message);
+  const trace = record.traceId
+    ? colorize(ANSI.dim, ` trace=${record.traceId}`)
+    : '';
+  const dur =
+    record.durationMs != null
+      ? colorize(ANSI.dim, ` +${record.durationMs}ms`)
+      : '';
+
+  let line = `${time} ${lvl} ${mod} ${msg}${trace}${dur}`;
+
+  if (record.meta !== undefined) {
+    const metaStr = JSON.stringify(record.meta, null, 2)
+      .split('\n')
+      .map((l, i) => colorize(ANSI.dim, (i === 0 ? '  ↳ ' : '    ') + l))
+      .join('\n');
+    line += '\n' + metaStr;
+  }
+
+  return line;
+}
+
+// Retorna [formatString, ...substitutions] prontos para console.log(...args)
+function formatBrowser(record: LogRecord): [string, ...string[]] {
+  const { badge, badgeCSS, msgCSS } = LEVEL_CSS[record.level];
+  const time  = record.ts.slice(11, 23);
+  const trace = record.traceId       ? `  trace=${record.traceId}`      : '';
+  const dur   = record.durationMs != null ? `  +${record.durationMs}ms` : '';
+
+  const fmt = `%c${time} %c${badge}%c [${record.module}] %c${record.message}${trace}${dur}`;
+  //           ↑ dim     ↑ badge     ↑ mod               ↑ msg  — 4 %c, 4 estilos
+  const args: [string, ...string[]] = [fmt, CSS.dim, badgeCSS, CSS.mod, msgCSS];
+
+  return args;
+}
+
+// ─── Entry point unificado ───────────────────────────────────────────────────
+
+function consoleOutput(record: LogRecord): void {
+  const fn = {
+    error: console.error,
+    warn: console.warn,
+    info: console.info,
+    debug: console.debug,
+    none: console.log,
+  }[record.level];
+
+  if (isBrowser) {
+    const [fmt, ...styles] = formatBrowser(record);
+    fn(fmt, ...styles);
+    if (record.meta !== undefined)
+      console.debug('%cmeta', CSS.meta, record.meta);
+    return;
+  }
+
+  fn(formatNode(record));
 }
 
 class LoggerClass {
@@ -84,7 +226,12 @@ class LoggerClass {
     this.activeTimers.set(label, Date.now());
   }
 
-  timeEnd(module: string, label: string, message: string, meta?: any): number | undefined {
+  timeEnd(
+    module: string,
+    label: string,
+    message: string,
+    meta?: any,
+  ): number | undefined {
     const start = this.activeTimers.get(label);
     if (!start) return undefined;
     const durationMs = Date.now() - start;
@@ -106,51 +253,63 @@ class LoggerClass {
       meta: record.meta !== undefined ? sanitize(record.meta) : undefined,
     };
 
-    // Notifica os handlers customizados (subscribers)
     this.handlers.forEach((h) => {
       try {
         h(sanitizedRecord);
       } catch {}
     });
 
-    // Output para console apenas se habilitado ativamente e dentro do nível configurado
     if (this.enabled && LEVELS[record.level] <= LEVELS[this.level]) {
-      const json = JSON.stringify(sanitizedRecord);
-      switch (record.level) {
-        case 'error':
-          console.error(json);
-          break;
-        case 'warn':
-          console.warn(json);
-          break;
-        case 'info':
-          console.info(json);
-          break;
-        case 'debug':
-          console.debug(json);
-          break;
-      }
+      consoleOutput(sanitizedRecord); // ← única mudança
     }
   }
 
   error(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('error')) return;
-    this.emit({ ts: new Date().toISOString(), module, level: 'error', message, meta, traceId });
+    this.emit({
+      ts: new Date().toISOString(),
+      module,
+      level: 'error',
+      message,
+      meta,
+      traceId,
+    });
   }
 
   warn(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('warn')) return;
-    this.emit({ ts: new Date().toISOString(), module, level: 'warn', message, meta, traceId });
+    this.emit({
+      ts: new Date().toISOString(),
+      module,
+      level: 'warn',
+      message,
+      meta,
+      traceId,
+    });
   }
 
   info(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('info')) return;
-    this.emit({ ts: new Date().toISOString(), module, level: 'info', message, meta, traceId });
+    this.emit({
+      ts: new Date().toISOString(),
+      module,
+      level: 'info',
+      message,
+      meta,
+      traceId,
+    });
   }
 
   debug(module: string, message: string, meta?: any, traceId?: string) {
     if (!this.shouldLog('debug')) return;
-    this.emit({ ts: new Date().toISOString(), module, level: 'debug', message, meta, traceId });
+    this.emit({
+      ts: new Date().toISOString(),
+      module,
+      level: 'debug',
+      message,
+      meta,
+      traceId,
+    });
   }
 }
 
